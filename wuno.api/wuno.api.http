@@ -1,0 +1,6 @@
+@wuno.api_HostAddress = http://localhost:5139
+
+GET {{wuno.api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
