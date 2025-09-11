@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using System;
 using wuno.infrastructure;
+using Wuno.Application.Games;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,6 +14,17 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<AppDbContext>(opt =>
   opt.UseSqlServer(builder.Configuration.GetConnectionString("Default")));
+builder.Services.AddScoped<IGameService, GameService>();
+builder.Services.AddControllers().AddJsonOptions(o => {
+    o.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+});
+builder.Services.AddRateLimiter(opts => {
+    opts.AddFixedWindowLimiter("submit", o => {
+        o.Window = TimeSpan.FromSeconds(1);
+        o.PermitLimit = 5;
+        o.QueueLimit = 0;
+    });
+});
 
 var app = builder.Build();
 
@@ -23,6 +36,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseCors(p => p.WithOrigins("http://localhost:5139", "http://localhost:3000", "https://localhost:7031", "http://localhost:5139")
+                  .AllowAnyHeader().AllowAnyMethod());
+app.UseRateLimiter();
 
 app.UseAuthorization();
 

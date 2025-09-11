@@ -17,6 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\wuno.application\Wuno.Application.csproj" />
     <ProjectReference Include="..\wuno.infrastructure\Wuno.Infrastructure.csproj" />
   </ItemGroup>
 

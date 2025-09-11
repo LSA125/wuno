@@ -24,6 +24,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wuno.Api", "wuno.api\Wuno.A
 		{76915AF7-58B8-4029-B3BD-E0D25C43066C} = {76915AF7-58B8-4029-B3BD-E0D25C43066C}
 	EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{EF144D82-799A-41EC-838C-FDF77AA08815}"
+	ProjectSection(SolutionItems) = preProject
+		todo.txt = todo.txt
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
