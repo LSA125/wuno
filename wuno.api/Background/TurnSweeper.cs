@@ -8,24 +8,25 @@ namespace Wuno.Api.Background
 {
     public class TurnSweeper : BackgroundService
     {
-        private readonly AppDbContext _db;
         private readonly IServiceScopeFactory _sf;
         private readonly IHubContext<GameHub> _hub;
-        private readonly IGameService _svc;
 
-        public TurnSweeper(AppDbContext db,IServiceScopeFactory sf, IHubContext<GameHub> hub, IGameService svc)
+        public TurnSweeper(IServiceScopeFactory sf, IHubContext<GameHub> hub)
         {
-            _db = db;
             _sf = sf;
             _hub = hub;
-            _svc = svc;
         }
 
         protected override async Task ExecuteAsync(CancellationToken ct)
         {
             while (!ct.IsCancellationRequested)
             {
+                //create scope to get new db context
+                var scope = _sf.CreateScope();
+                var _db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var _svc = scope.ServiceProvider.GetService<IGameService>();
                 // find overdue turns (SQL DateDiff or computed EndAt)
+                if(_svc is null) throw new Exception("GameService not available in TurnSweeper");
                 var overdue = await _svc.FindOverdueAsync(_db, ct);
                 foreach (var (gameId, turnId) in overdue)
                 {
