@@ -14,7 +14,7 @@ namespace wuno.domain
         public int TargetWins { get; set; } = 2;
         public int NextSeat { get; set; } = 0;
         public int Direction { get; set; } = 1; // 1 for clockwise, -1 for counter-clockwise
-        DateTime CreatedAt { get; init; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
         public List<Player> Players { get; } = new();
         public List<Round> Rounds { get; } = new();
         public List<Turn> Turns { get; } = new();
@@ -40,6 +40,7 @@ namespace wuno.domain
         public Guid? WinnerId { get; set; }
         public DateTime? StartedAt { get; init; } = DateTime.UtcNow;
         public DateTime? EndedAt { get; set; }
+        public Game Game { get; set; } = null!;
 
     }
     public sealed class Turn
@@ -59,6 +60,9 @@ namespace wuno.domain
         public int? WordLen { get; set; }
         public DateTime? EndedAt { get; set; }
         public TurnEndReason? EndReason { get; set; }
+
+        public Game Game { get; set; } = null!;
+        public Round Round { get; set; } = null!;
     }
     public sealed class Effect
     {
@@ -69,6 +73,7 @@ namespace wuno.domain
         public EffectType Type { get; set; }
         public int Value { get; set; } // seconds or +/- length; bool as 0/1
         public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
+        public Game Game { get; set; } = null!;
     }
 
 }

@@ -171,5 +171,36 @@ namespace Wuno.Application.Games
             game.NextSeat = seat;
             await Task.CompletedTask;
         }
+        //find overdue turns
+        async public Task<List<(Guid gameId, Guid turnId)>> FindOverdueAsync(AppDbContext db, CancellationToken ct)
+        {
+            var now = DateTime.UtcNow;
+            return await db.Turns
+              .Where(t => t.EndedAt == null && t.StartedAt.AddSeconds(t.DurationSec) <= now)
+              .Select(t => new { t.GameId, t.Id })
+              .AsNoTracking()
+              .ToListAsync(ct)
+              .ContinueWith(t => t.Result.Select(x => (x.GameId, x.Id)).ToList(), ct);
+        }
+        //Timeout and advance turn
+        async public Task TimeoutAndAdvanceAsync(AppDbContext db, Guid gameId, Guid turnId, CancellationToken ct)
+        {
+            var game = await db.Games
+              .Include(g => g.Players)
+              .Include(g => g.Rounds.OrderByDescending(r => r.Index))
+              .Include(g => g.Turns.OrderByDescending(t => t.Index))
+              .Include(g => g.Effects)
+              .FirstOrDefaultAsync(g => g.Id == gameId, ct);
+            if (game is null) return;
+            var turn = game.Turns.FirstOrDefault(t => t.Id == turnId);
+            var round = game.Rounds.First();
+            if (turn is null || round is null) return;
+            if (turn.EndedAt != null) return; // already ended
+
+            turn.EndedAt = DateTime.UtcNow; turn.EndReason = TurnEndReason.TIMEOUT;
+            await StartNextTurnAsync(db, game, round, prevAcceptedLetter: turn.Word?.LastOrDefault(), ct);
+            await db.SaveChangesAsync(ct);
+        }
+
     }
 }

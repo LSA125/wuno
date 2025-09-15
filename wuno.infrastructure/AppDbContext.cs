@@ -17,9 +17,11 @@ namespace wuno.infrastructure
         protected override void OnModelCreating(ModelBuilder b)
         {
             b.Entity<Game>().HasMany(g => g.Players).WithOne().HasForeignKey(p => p.GameId);
-            b.Entity<Game>().HasMany(g => g.Rounds).WithOne().HasForeignKey(r => r.GameId);
-            b.Entity<Game>().HasMany(g => g.Turns).WithOne().HasForeignKey(t => t.GameId);
-            b.Entity<Game>().HasMany(g => g.Effects).WithOne().HasForeignKey(e => e.GameId);
+            b.Entity<Game>().HasMany(g => g.Rounds).WithOne(r => r.Game).HasForeignKey(r => r.GameId);
+            b.Entity<Game>().HasMany(g => g.Turns).WithOne(t => t.Game).HasForeignKey(t => t.GameId);
+            b.Entity<Game>().HasMany(g => g.Effects).WithOne(e => e.Game).HasForeignKey(e => e.GameId);
+
+            b.Entity<Turn>().HasOne(t => t.Round).WithMany().HasForeignKey(t => t.RoundId);
 
             b.Entity<Player>().HasIndex(p => new { p.GameId, p.Seat }).IsUnique();
             b.Entity<Round>().HasIndex(r => new { r.GameId, r.Index });
