@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using System;
 using wuno.infrastructure;
+using Wuno.Api.Background;
+using Wuno.Api.Hubs;
 using Wuno.Application.Games;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -25,6 +27,8 @@ builder.Services.AddRateLimiter(opts => {
         o.QueueLimit = 0;
     });
 });
+builder.Services.AddHostedService<TurnSweeper>();
+builder.Services.AddSignalR();
 
 var app = builder.Build();
 
@@ -38,6 +42,7 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseCors(p => p.WithOrigins("http://localhost:5139", "http://localhost:3000", "https://localhost:7031", "http://localhost:5139")
                   .AllowAnyHeader().AllowAnyMethod());
+app.MapHub<GameHub>("hub");
 app.UseRateLimiter();
 
 app.UseAuthorization();
