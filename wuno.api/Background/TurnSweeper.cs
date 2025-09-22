@@ -34,7 +34,7 @@ namespace Wuno.Api.Background
                     var state = await _svc.GetGameStateAsync(gameId, ct);
                     await _hub.Clients.Group($"game:{gameId}").SendAsync("GameUpdated", state, ct);
                 }
-                await Task.Delay(500, ct);
+                await Task.Delay(10000, ct);
             }
         }
     }
