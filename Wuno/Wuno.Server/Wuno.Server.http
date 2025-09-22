@@ -1,6 +1,0 @@
-@Wuno.Server_HostAddress = http://localhost:5005
-
-GET {{Wuno.Server_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
