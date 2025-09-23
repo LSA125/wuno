@@ -12,6 +12,10 @@ const baseFolder =
         ? `${env.APPDATA}/ASP.NET/https`
         : `${env.HOME}/.aspnet/https`;
 
+if (!fs.existsSync(baseFolder)) {
+    fs.mkdirSync(baseFolder, { recursive: true });
+}
+
 const certificateName = "wuno.client";
 const certFilePath = path.join(baseFolder, `${certificateName}.pem`);
 const keyFilePath = path.join(baseFolder, `${certificateName}.key`);
@@ -31,7 +35,7 @@ if (!fs.existsSync(certFilePath) || !fs.existsSync(keyFilePath)) {
 }
 
 const target = env.ASPNETCORE_HTTPS_PORT ? `https://localhost:${env.ASPNETCORE_HTTPS_PORT}` :
-    env.ASPNETCORE_URLS ? env.ASPNETCORE_URLS.split(';')[0] : 'https://localhost:7081';
+    env.ASPNETCORE_URLS ? env.ASPNETCORE_URLS.split(';')[0] : 'https://localhost:7031';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -43,10 +47,17 @@ export default defineConfig({
     },
     server: {
         proxy: {
-            '^/weatherforecast': {
+            '^/hub': {
                 target,
-                secure: false
-            }
+                ws: true,
+                secure: false,
+                changeOrigin: true,
+            },
+            '^/api': {
+                target,
+                secure: false,
+                changeOrigin: true,
+            },
         },
         port: 5173,
         https: {
@@ -54,4 +65,5 @@ export default defineConfig({
             cert: fs.readFileSync(certFilePath),
         }
     }
+
 })

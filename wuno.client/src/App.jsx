@@ -1,8 +1,6 @@
 import { useState } from "react";
 import "./App.css";
 
-const API = import.meta.env.VITE_API ?? "";
-
 export default function App() {
     const [data, setData] = useState(null);
     const [count, setCount] = useState(2);
@@ -12,7 +10,7 @@ export default function App() {
     async function createGame() {
         try {
             setLoading(true); setErr("");
-            const res = await fetch(`${API}/api/hotseat/new`, {
+            const res = await fetch(`/api/hotseat/new`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ playerCount: count, targetWins: 2 })
