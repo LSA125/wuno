@@ -22,13 +22,15 @@ builder.Services.AddControllers().AddJsonOptions(o => {
 });
 builder.Services.AddRateLimiter(opts => {
     opts.AddFixedWindowLimiter("submit", o => {
-        o.Window = TimeSpan.FromSeconds(1);
+        o.Window = TimeSpan.FromSeconds(10);
         o.PermitLimit = 5;
         o.QueueLimit = 0;
     });
 });
 builder.Services.AddHostedService<TurnSweeper>();
 builder.Services.AddSignalR();
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
 
 var app = builder.Build();
 
