@@ -16,7 +16,8 @@ namespace Wuno.Api.Controllers
         [HttpPost("hotseat/new")]
         public async Task<IActionResult> New([FromBody] NewGameRequest request, CancellationToken cancellationToken)
         {
-            var res = await _svc.StartNewGameAsync(request, cancellationToken);
+            NewGameResponse res = await _svc.StartNewGameAsync(request, cancellationToken);
+
             return Ok(res);
         }
         [HttpPost("games/{id:guid}")]

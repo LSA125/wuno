@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.SignalR;
+using System.Runtime.InteropServices;
 using Wuno.Application.Games;
 
 namespace Wuno.Api.Hubs
@@ -14,17 +15,17 @@ namespace Wuno.Api.Hubs
             _hub = hub;
         }
 
-        public Task JoinGame(string gameId)
+        public async Task ConnectToGame(string gameCode)
         {
-            return Groups.AddToGroupAsync(Context.ConnectionId, $"game:{gameId}");
+            await Groups.AddToGroupAsync(Context.ConnectionId, $"game:{gameCode}");
         }
 
-        public async Task SubmitWord(string gameId, int seat, string word, CancellationToken ct)
+        public async Task SubmitWord(string gameCode, int seat, string word, CancellationToken ct)
         {
-            var ok = await _svc.SubmitWordAsync(Guid.Parse(gameId), new SubmitWordRequest(seat, word), ct);
+            var ok = await _svc.SubmitWordAsync(Guid.Parse(gameCode), new SubmitWordRequest(seat, word), ct);
             // Regardless of ok/err, send the fresh state so clients stay in sync:
-            var state = await _svc.GetGameStateAsync(Guid.Parse(gameId), ct);
-            await _hub.Clients.Group($"game:{gameId}").SendAsync("GameUpdated", state, ct);
+            var state = await _svc.GetGameStateAsync(Guid.Parse(gameCode), ct);
+            await _hub.Clients.Group($"game:{gameCode}").SendAsync("GameUpdated", state, ct);
         }
     }
 }

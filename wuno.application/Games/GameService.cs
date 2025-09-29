@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Azure.Identity;
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -56,13 +57,13 @@ namespace Wuno.Application.Games
             if (game is null) return null;
             var round = game.Rounds.FirstOrDefault();
             var turn = game.Turns.FirstOrDefault();
-            return new
-            {
-                game = new { game.Id, game.Status, game.TargetWins, game.NextSeat, playerCount = game.Players.Count },
-                players = game.Players.Select(p => new { p.Seat, p.LastWordLength }),
+            if (round is null || turn is null) return null;
+            return new GameState(
+                game.Id, game.Status, game.TargetWins, game.Direction, game.NextSeat,
+                game.Players,
                 round,
                 turn
-            };
+            );
         }
 
         public async Task<SubmitWordResponse> SubmitWordAsync(Guid gameId, SubmitWordRequest req, CancellationToken ct)
@@ -171,25 +172,32 @@ namespace Wuno.Application.Games
             game.NextSeat = seat;
             await Task.CompletedTask;
         }
-        async public Task<JoinGameRequest> JoinGameAsync(AppDbContext db, Guid gameId, Guid playerId, CancellationToken ct)
+        async public Task<JoinGameRequest> JoinGameAsync(AppDbContext db, Guid gameId, Guid userId, CancellationToken ct)
         {
             var game = await db.Games
               .Include(g => g.Players)
               .FirstOrDefaultAsync(g => g.Id == gameId, ct);
             if (game is null) throw new Exception("Game not found");
             //check for reconnect
-            Player? player = db.Find<Player>(playerId);
+            User? user = db.Users.Include(u => u.ActivePlayer).FirstOrDefault(u => u.Id == userId);
+            if(user is null)
+            {
+                throw new Exception("User does not exist when joining game");
+            }
+            Player? player = user.ActivePlayer;
+            //if player is already in a game
             if (player is not null && player.GameId == gameId)
             {
                 player.IsConnected = true;
                 await db.SaveChangesAsync(ct);
-                return new JoinGameRequest(gameId);
+                return new JoinGameRequest(gameId,);
             }
             else if (game.Status != GameStatus.WAITING) throw new Exception("Game not joinable");
             var inactive = game.Players.FirstOrDefault(p => !p.IsActive);
             if (inactive is null) throw new Exception("Game full");
             inactive.IsActive = true;
-            inactive.Name = playerName;
+            inactive.Name = user.Name;
+            inactive.IconUrl = user.IconUrl;
             await db.SaveChangesAsync(ct);
             return new JoinGameRequest(gameId);
         }

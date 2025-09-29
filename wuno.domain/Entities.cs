@@ -6,10 +6,22 @@ using System.Threading.Tasks;
 
 namespace wuno.domain
 {
-
+    public sealed class User
+    {
+        public Guid Id { get; init; } = Guid.NewGuid();
+        public string Name { get; set; } = "";
+        public string? IconUrl { get; set; }
+        public string? Email { get; set; }
+        public string? PasswordHash { get; set; }
+        public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
+        public DateTime LastActiveAt { get; set; } = DateTime.UtcNow;
+        public Guid? ActivePlayerId { get; set; }
+        public Player? ActivePlayer { get; set; }
+    }
     public sealed class Game
     {
         public Guid Id { get; init; } = Guid.NewGuid();
+        public string Code { get; set; } = "";
         public GameStatus Status { get; set; } = GameStatus.ACTIVE;
         public int TargetWins { get; set; } = 2;
         public int NextSeat { get; set; } = 0;
@@ -25,6 +37,8 @@ namespace wuno.domain
     {
         public Guid Id { get; init; } = Guid.NewGuid();
         public Guid GameId { get; set; }
+        public Guid? UserId { get; set; }
+        public User? User { get; set; }
         public string Name { get; set; } = "";
         public string? IconUrl { get; set; } = "";
         public bool IsActive { get; set; }

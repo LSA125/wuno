@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using wuno.domain;
 
 namespace Wuno.Application.Games
 {
@@ -12,6 +13,7 @@ namespace Wuno.Application.Games
     public record ErrorResponse(string Reason);
     public record SubmitWordRequest(int Seat, string Word);
     public record SubmitWordResponse(bool Ok, string? Reason);
-    public record JoinGameRequest(Guid GameId);
+    public record JoinGameRequest(Guid GameId, Guid UserId);
     public record LeaveGameRequest(Guid GameId, Guid PlayerId);
+    public record GameState(Guid GameId, GameStatus Status, int NextSeat, int Direction, int TargetWins, List<Player> Players, Round CurrentRound, Turn CurrentTurn);
 }
