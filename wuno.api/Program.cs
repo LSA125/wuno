@@ -31,6 +31,7 @@ builder.Services.AddHostedService<TurnSweeper>();
 builder.Services.AddSignalR();
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
+builder.Services.AddCors();
 
 var app = builder.Build();
 
@@ -42,9 +43,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseCors(p => p.WithOrigins("http://localhost:5139", "http://localhost:3000", "https://localhost:7031", "http://localhost:5139")
+app.UseCors(p => p.WithOrigins("https://localhost:5173", "http://localhost:3000", "https://localhost:7031", "http://localhost:5139")
                   .AllowAnyHeader().AllowAnyMethod());
-app.MapHub<GameHub>("hub");
+app.MapHub<GameHub>("hubs/game");
 app.UseRateLimiter();
 
 app.UseAuthorization();

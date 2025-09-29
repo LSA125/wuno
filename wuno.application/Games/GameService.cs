@@ -171,6 +171,34 @@ namespace Wuno.Application.Games
             game.NextSeat = seat;
             await Task.CompletedTask;
         }
+        async public Task<JoinGameRequest> JoinGameAsync(AppDbContext db, Guid gameId, Guid playerId, CancellationToken ct)
+        {
+            var game = await db.Games
+              .Include(g => g.Players)
+              .FirstOrDefaultAsync(g => g.Id == gameId, ct);
+            if (game is null) throw new Exception("Game not found");
+            //check for reconnect
+            Player? player = db.Find<Player>(playerId);
+            if (player is not null && player.GameId == gameId)
+            {
+                player.IsConnected = true;
+                await db.SaveChangesAsync(ct);
+                return new JoinGameRequest(gameId);
+            }
+            else if (game.Status != GameStatus.WAITING) throw new Exception("Game not joinable");
+            var inactive = game.Players.FirstOrDefault(p => !p.IsActive);
+            if (inactive is null) throw new Exception("Game full");
+            inactive.IsActive = true;
+            inactive.Name = playerName;
+            await db.SaveChangesAsync(ct);
+            return new JoinGameRequest(gameId);
+        }
+        async public Task LeaveGameAsync(AppDbContext db, Guid gameId, Guid playerId, CancellationToken ct)
+        {
+            //mark player as left
+            db.Find<Player>(playerId)!.IsConnected = false;
+            await db.SaveChangesAsync(ct);
+        }
         //find overdue turns
         async public Task<List<(Guid gameId, Guid turnId)>> FindOverdueAsync(AppDbContext db, CancellationToken ct)
         {

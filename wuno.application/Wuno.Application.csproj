@@ -7,6 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="TypeGen" Version="6.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\wuno.infrastructure\Wuno.Infrastructure.csproj" />
   </ItemGroup>
 

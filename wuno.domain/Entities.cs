@@ -25,6 +25,11 @@ namespace wuno.domain
     {
         public Guid Id { get; init; } = Guid.NewGuid();
         public Guid GameId { get; set; }
+        public string Name { get; set; } = "";
+        public string? IconUrl { get; set; } = "";
+        public bool IsActive { get; set; }
+        public bool IsConnected { get; set; }
+        public bool IsHost { get; set; }
         public int Seat { get; set; }
         public int RoundWins { get; set; }
         public string? LastWord { get; set; }
