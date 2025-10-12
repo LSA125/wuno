@@ -172,7 +172,7 @@ namespace Wuno.Application.Games
             game.NextSeat = seat;
             await Task.CompletedTask;
         }
-        async public Task<JoinGameResponse> JoinGameAsync(AppDbContext db, Guid gameId, Guid userId, CancellationToken ct)
+        async public Task<JoinGameRequest> JoinGameAsync(AppDbContext db, Guid gameId, Guid userId, CancellationToken ct)
         {
             var game = await db.Games
               .Include(g => g.Players)
@@ -190,9 +190,7 @@ namespace Wuno.Application.Games
             {
                 player.IsConnected = true;
                 await db.SaveChangesAsync(ct);
-                GameState? gameState = await GetGameStateAsync(gameId, ct) as GameState;
-                if (gameState is null) throw new Exception("Failed to get game state after joining");
-                return new JoinGameResponse(gameId, gameState);
+                return new JoinGameRequest(gameId,);
             }
             else if (game.Status != GameStatus.WAITING) throw new Exception("Game not joinable");
             var inactive = game.Players.FirstOrDefault(p => !p.IsActive);
@@ -201,9 +199,7 @@ namespace Wuno.Application.Games
             inactive.Name = user.Name;
             inactive.IconUrl = user.IconUrl;
             await db.SaveChangesAsync(ct);
-            GameState? state = await GetGameStateAsync(gameId, ct) as GameState;
-            if (state is null) throw new Exception("Failed to get game state after joining");
-            return new JoinGameResponse(gameId, state);
+            return new JoinGameRequest(gameId);
         }
         async public Task LeaveGameAsync(AppDbContext db, Guid gameId, Guid playerId, CancellationToken ct)
         {
