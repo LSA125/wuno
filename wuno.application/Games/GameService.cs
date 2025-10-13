@@ -225,22 +225,32 @@ namespace Wuno.Application.Games
         //Timeout and advance turn
         async public Task TimeoutAndAdvanceAsync(AppDbContext db, Guid gameId, Guid turnId, CancellationToken ct)
         {
-            var game = await db.Games
-              .Include(g => g.Players)
-              .Include(g => g.Rounds.OrderByDescending(r => r.Index))
-              .Include(g => g.Turns.OrderByDescending(t => t.Index))
-              .Include(g => g.Effects)
-              .FirstOrDefaultAsync(g => g.Id == gameId, ct);
+            // in IGameService.TimeoutAndAdvanceAsync
+            var affected = await _db.Turns
+                .Where(t => t.Id == turnId && t.EndedAt == null)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(t => t.EndedAt, _ => DateTime.UtcNow)
+                    .SetProperty(t => t.EndReason, _ => TurnEndReason.TIMEOUT), ct);
+
+            if (affected == 0) return; // already processed elsewhere
+
+            // now load fresh state and advance
+            var game = await _db.Games
+                .AsTracking()
+                .Include(g => g.Players)
+                .Include(g => g.Rounds.OrderByDescending(r => r.Index))
+                .Include(g => g.Turns.OrderByDescending(t => t.Index))
+                .Include(g => g.Effects)
+                .FirstOrDefaultAsync(g => g.Id == gameId, ct);
             if (game is null) return;
+
+            var round = game.Rounds.FirstOrDefault();
             var turn = game.Turns.FirstOrDefault(t => t.Id == turnId);
-            var round = game.Rounds.First();
-            if (turn is null || round is null) return;
-            if (turn.EndedAt != null) return; // already ended
+            if (round is null || turn is null) return;
 
-            turn.EndedAt = DateTime.UtcNow; turn.EndReason = TurnEndReason.TIMEOUT;
-            await StartNextTurnAsync(db, game, round, prevAcceptedLetter: turn.Word?.LastOrDefault(), ct);
-            await db.SaveChangesAsync(ct);
+            await StartNextTurnAsync(_db, game, round, prevAcceptedLetter: turn.Word?.LastOrDefault(), ct);
+            await _db.SaveChangesAsync(ct);
+
         }
-
     }
 }
