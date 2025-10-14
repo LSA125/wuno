@@ -133,7 +133,7 @@ namespace Wuno.Application.Games
             await StartNextTurnAsync(_db, game, round, nextLetter, ct);
 
             await _db.SaveChangesAsync(ct);
-            return new(true, null);
+            return new SubmitWordResponse(true, null);
         }
 
         static int NextSeat(int n, int seat, int dir) => ((seat - 1 + dir + n) % n) + 1;
@@ -248,9 +248,10 @@ namespace Wuno.Application.Games
             var turn = game.Turns.FirstOrDefault(t => t.Id == turnId);
             if (round is null || turn is null) return;
 
+            // set player as inactive, as player has lost the round.
+            var player = game.Players.Single(p => p.Seat == turn.Seat).IsActive = false;
             await StartNextTurnAsync(_db, game, round, prevAcceptedLetter: turn.Word?.LastOrDefault(), ct);
             await _db.SaveChangesAsync(ct);
-
         }
     }
 }

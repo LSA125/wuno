@@ -30,6 +30,12 @@ namespace wuno.domain.Rules
         }
         public static int VowelCount(string w) => Normalize(w).Count(c => Vowels.Contains(c));
         public static bool IsWord(string w) => Normalize(w).Length >= 2; // swap for real dict later
+        public static int ReverseMatchLength(string first, string second)
+        {
+            var A = Normalize(first); var B = Normalize(second);
+            int len = 0; while (len < A.Length && len < B.Length && A[A.Length - 1 - len] == B[len]) len++;
+            return len;
+        }
     }
 
 }
