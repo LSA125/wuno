@@ -15,6 +15,23 @@ namespace Wuno.Application.Games
     {
         private readonly AppDbContext _db;
         public GameService(AppDbContext db) { _db = db; }
+
+        public async Task<Guid> GetGameId(string code, CancellationToken ct)
+        {
+            var game = await _db.Games
+              .AsNoTracking()
+              .FirstOrDefaultAsync(g => g.Code == code, ct);
+            if (game is null) throw new Exception("Game not found");
+            return game.Id;
+        }
+        public async Task<List<Player>> GetPlayers(Guid gameId, CancellationToken ct)
+        {
+            var game = await _db.Games
+              .Include(g => g.Players)
+              .FirstOrDefaultAsync(g => g.Id == gameId, ct);
+            if (game is null) throw new Exception("Game not found");
+            return game.Players;
+        }
         public async Task ReadyAsync(Guid gameId, int seat, bool isReady, CancellationToken ct)
         {
             var game = await _db.Games

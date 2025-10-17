@@ -25,6 +25,7 @@ namespace wuno.infrastructure
 
             b.Entity<Turn>().HasOne(t => t.Round).WithMany().HasForeignKey(t => t.RoundId).OnDelete(DeleteBehavior.Restrict);
 
+            b.Entity<Game>().HasIndex(g => g.Code).IsUnique().HasFilter("[Status] <> @finished");
             b.Entity<Player>().HasIndex(p => new { p.GameId, p.Seat }).IsUnique();
             b.Entity<Round>().HasIndex(r => new { r.GameId, r.Index });
             b.Entity<Turn>().HasIndex(t => new { t.GameId, t.Index });
