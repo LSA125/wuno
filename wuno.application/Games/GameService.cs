@@ -15,12 +15,27 @@ namespace Wuno.Application.Games
     {
         private readonly AppDbContext _db;
         public GameService(AppDbContext db) { _db = db; }
-
+        public async Task ReadyAsync(Guid gameId, int seat, bool isReady, CancellationToken ct)
+        {
+            var game = await _db.Games
+              .Include(g => g.Players)
+              .FirstOrDefaultAsync(g => g.Id == gameId, ct);
+            if (game is null) throw new Exception("Game not found");
+            if(game.Status != GameStatus.WAITING) throw new Exception("Game already started");
+            var player = game.Players.SingleOrDefault(p => p.Seat == seat);
+            if (player is null) throw new Exception("Player not found");
+            player.IsActive = isReady;
+            await _db.SaveChangesAsync(ct);
+        }
         public async Task<NewGameResponse> StartNewGameAsync(NewGameRequest req, CancellationToken ct)
         {
             var n = Math.Clamp(req.PlayerCount, Constants.MIN_PLAYERS, Constants.MAX_PLAYERS);
-            var game = new Game { TargetWins = Math.Clamp(req.TargetWins, Constants.MIN_TARGET_WINS, Constants.MAX_TARGET_WINS), 
-                                  NextSeat = 1, Status = GameStatus.ACTIVE };
+            var game = new Game
+            {
+                TargetWins = Math.Clamp(req.TargetWins, Constants.MIN_TARGET_WINS, Constants.MAX_TARGET_WINS),
+                NextSeat = 1,
+                Status = GameStatus.ACTIVE
+            };
             for (int i = 1; i <= n; i++) game.Players.Add(new Player { Seat = i, GameId = game.Id });
 
             var round0 = new Round { GameId = game.Id, Index = 0, Active = true };
@@ -45,6 +60,19 @@ namespace Wuno.Application.Games
             await _db.SaveChangesAsync(ct);
 
             return new NewGameResponse(game.Id, turn0.Id, 1, n, game.TargetWins);
+        }
+
+        public async Task StartMatchAsync(Guid gameId, CancellationToken ct)
+        {
+            var game = await _db.Games
+              .Include(g => g.Players)
+              .FirstOrDefaultAsync(g => g.Id == gameId, ct);
+            if (game is null) throw new Exception("Game not found");
+            if (game.Status != GameStatus.WAITING) throw new Exception("Game already started");
+            if (game.Players.Count(p => p.IsActive) < 2) throw new Exception("Not enough players ready");
+            game.Status = GameStatus.ACTIVE;
+            game.Turns.First().StartedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync(ct);
         }
 
         public async Task<object?> GetGameStateAsync(Guid gameId, CancellationToken ct)
