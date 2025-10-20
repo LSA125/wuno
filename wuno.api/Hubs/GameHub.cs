@@ -9,23 +9,34 @@ namespace Wuno.Api.Hubs
     {
         private readonly IGameService _svc;
         private readonly IHubContext<GameHub> _hub;
+        private readonly IGroupTracker _tracker;
 
-        public GameHub(IGameService svc, IHubContext<GameHub> hub)
+        public GameHub(IGameService svc, IHubContext<GameHub> hub, IGroupTracker tracker)
         {
             _svc = svc;
             _hub = hub;
+            _tracker = tracker;
         }
 
-        public async Task ConnectToGame(string gameCode)
+        public async Task ConnectToGame(string gameCode, CancellationToken ct)
         {
-            Guid gameId = await _svc.GetGameId(gameCode, CancellationToken.None);
-            await Groups.AddToGroupAsync(Context.ConnectionId, $"game:{gameId}");
+            Guid gameId = await _svc.GetGameId(gameCode, ct);
+            _tracker.Add(Context.ConnectionId, $"game:{gameId}");
+            await Groups.AddToGroupAsync(Context.ConnectionId, $"game:{gameId}", ct);
+        }
+        public async Task LeaveGame(Guid gameid, CancellationToken ct)
+        {
+            _tracker.Remove(Context.ConnectionId, $"game:{gameid}");
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"game:{gameid}", ct);
         }
 
         public async override Task OnDisconnectedAsync(Exception? exception)
         {
-            // Note: We don't know what groups the connection was in, so we can't remove it from specific groups.
-            // SignalR handles this automatically when the connection is closed, so no action is needed here.
+            _tracker.GetGroups(Context.ConnectionId).ToList().ForEach(async group =>
+            {
+                await Clients.Group(group).SendAsync("PlayerDisconnected", Context.ConnectionId);
+            });
+            _tracker.Clear(Context.ConnectionId);
             await base.OnDisconnectedAsync(exception);
         }
 
