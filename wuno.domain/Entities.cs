@@ -88,7 +88,7 @@ namespace wuno.domain
         public Guid Id { get; init; } = Guid.NewGuid();
         public Guid GameId { get; set; }
         public Guid RoundId { get; set; }
-        public Guid PlayerId { get; set; }
+        public int Seat { get; set; }
         public int AppliesOn { get; set; } // recipient’s personal next turn index
         public EffectType Type { get; set; }
         public int Value { get; set; } // seconds or +/- length; bool as 0/1

@@ -9,16 +9,16 @@ namespace Wuno.Application.Games
 {
     public sealed class GroupTracker
     {
-        private readonly ConcurrentDictionary<string, HashSet<string>> _map = new();
-        public void Add(string connectionId, string group)
+        private readonly ConcurrentDictionary<string, HashSet<Guid>> _map = new();
+        public void Add(string connectionId, Guid group)
         {
-            var groups = _map.GetOrAdd(connectionId, _ => new HashSet<string>(StringComparer.Ordinal));
+            var groups = _map.GetOrAdd(connectionId, _ => new HashSet<Guid>());
             lock (groups)
             {
                 groups.Add(group);
             }
         }
-        public void Remove(string connectionId, string group)
+        public void Remove(string connectionId, Guid group)
         {
             if (_map.TryGetValue(connectionId, out var groups))
             {
@@ -32,7 +32,7 @@ namespace Wuno.Application.Games
                 }
             }
         }
-        public IReadOnlyCollection<string> GetGroups(string connectionId)
+        public IReadOnlyCollection<Guid> GetGroups(string connectionId)
         {
             if (_map.TryGetValue(connectionId, out var groups))
             {
@@ -41,7 +41,7 @@ namespace Wuno.Application.Games
                     return groups.ToList().AsReadOnly();
                 }
             }
-            return Array.Empty<string>();
+            return [];
         }
         public void Clear(string connectionId)
         {

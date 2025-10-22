@@ -8,9 +8,9 @@ namespace Wuno.Application.Games
 {
     public interface IGroupTracker
     {
-        void Add(string connectionId, string group);
-        void Remove(string connectionId, string group);
-        IReadOnlyCollection<string> GetGroups(string connectionId);
+        void Add(string connectionId, Guid group);
+        void Remove(string connectionId, Guid group);
+        IReadOnlyCollection<Guid> GetGroups(string connectionId);
         void Clear(string connectionId);
     }
 }

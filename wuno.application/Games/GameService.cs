@@ -51,32 +51,17 @@ namespace Wuno.Application.Games
             {
                 TargetWins = Math.Clamp(req.TargetWins, Constants.MIN_TARGET_WINS, Constants.MAX_TARGET_WINS),
                 NextSeat = 1,
-                Status = GameStatus.ACTIVE
+                Status = GameStatus.WAITING
             };
             for (int i = 1; i <= n; i++) game.Players.Add(new Player { Seat = i, GameId = game.Id });
 
             var round0 = new Round { GameId = game.Id, Index = 0, Active = true };
             game.Rounds.Add(round0);
 
-            var turn0 = new Turn
-            {
-                GameId = game.Id,
-                RoundId = round0.Id,
-                Index = 0,
-                Seat = 1,
-                StartLetter = null,
-                FreeStart = true,
-                MinLen = 1,
-                Require2Vowels = false,
-                DurationSec = Constants.DEFAULT_TURN_DUR_SEC,
-                StartedAt = DateTime.UtcNow
-            };
-            game.Turns.Add(turn0);
-
             _db.Games.Add(game);
             await _db.SaveChangesAsync(ct);
 
-            return new NewGameResponse(game.Id, turn0.Id, 1, n, game.TargetWins);
+            return new NewGameResponse(game.Id, round0.Id, 1, n, game.TargetWins);
         }
 
         public async Task StartMatchAsync(Guid gameId, CancellationToken ct)
@@ -88,26 +73,71 @@ namespace Wuno.Application.Games
             if (game.Status != GameStatus.WAITING) throw new Exception("Game already started");
             if (game.Players.Count(p => p.IsActive) < 2) throw new Exception("Not enough players ready");
             game.Status = GameStatus.ACTIVE;
-            game.Turns.First().StartedAt = DateTime.UtcNow;
+            var turn0 = new Turn
+            {
+                GameId = game.Id,
+                RoundId = game.Rounds.First().Id,
+                Index = 0,
+                Seat = game.NextSeat,
+                StartLetter = null,
+                FreeStart = true,
+                MinLen = Constants.DEFAULT_START_LEN,
+                Require2Vowels = false,
+                DurationSec = Constants.DEFAULT_TURN_DUR_SEC,
+                StartedAt = DateTime.UtcNow
+            };
+            game.Turns.Add(turn0);
             await _db.SaveChangesAsync(ct);
         }
-
-        public async Task<object?> GetGameStateAsync(Guid gameId, CancellationToken ct)
+        public async Task<List<PlayerState>> GetPlayersAsync(Guid gameId, CancellationToken ct)
+        {
+            var game = await _db.Games
+              .Include(g => g.Players)
+              .FirstOrDefaultAsync(g => g.Id == gameId, ct);
+            if (game is null) throw new Exception("Game not found");
+            return game.Players
+                .OrderBy(p => p.Seat)
+                .Select(p => new PlayerState(p.Id, p.Seat, p.IsActive, p.IsConnected, p.IsHost, p.Name, p.IconUrl, p.RoundWins, p.LastWord, p.LastWordLength))
+                .ToList();
+        }
+        public async Task<RoundState> GetRoundAsync(Guid roundId, CancellationToken ct)
+        {
+            var round = await _db.Rounds
+              .AsNoTracking()
+              .FirstOrDefaultAsync(r => r.Id == roundId, ct);
+            if (round is null) throw new Exception("Round not found");
+            return new RoundState(round.Id, round.Index, round.Active, round.WinnerId, round.StartedAt, round.EndedAt);
+        }
+        public async Task<TurnState> GetTurnState(Guid gameId, Guid turnId, CancellationToken ct)
+        {
+            var turn = await _db.Turns
+              .AsNoTracking()
+              .FirstOrDefaultAsync(t => t.Id == turnId && t.GameId == gameId, ct);
+            if (turn is null) throw new Exception("Turn not found");
+            var effects = await _db.Effects
+              .AsNoTracking()
+              .Where(e => e.GameId == gameId && e.Seat == turn.Seat && e.AppliesOn == turn.Index)
+              .Select(e => new EffectState(e.Type, e.Value))
+              .ToListAsync(ct);
+            return new TurnState(turn.Id, turn.Index, turn.Seat, turn.StartedAt, turn.DurationSec, turn.EndedAt.HasValue, turn.Word,
+                effects);
+        }
+        public async Task<GameState> GetGameStateAsync(Guid gameId, CancellationToken ct)
         {
             var game = await _db.Games
               .Include(g => g.Players.OrderBy(p => p.Seat))
               .Include(g => g.Rounds.OrderByDescending(r => r.Index))
               .Include(g => g.Turns.OrderByDescending(t => t.Index))
               .FirstOrDefaultAsync(g => g.Id == gameId, ct);
-            if (game is null) return null;
+            if (game is null) throw new Exception("Game not found");
             var round = game.Rounds.FirstOrDefault();
             var turn = game.Turns.FirstOrDefault();
-            if (round is null || turn is null) return null;
+            if (round is null || turn is null) throw new Exception("Game has no active round/turn");
             return new GameState(
                 game.Id, game.Status, game.TargetWins, game.Direction, game.NextSeat,
-                game.Players,
-                round,
-                turn
+                GetPlayersAsync(gameId, ct).Result,
+                GetRoundAsync(round.Id,ct).Result,
+                
             );
         }
 
@@ -250,25 +280,28 @@ namespace Wuno.Application.Games
             if (state is null) throw new Exception("Failed to get game state after joining");
             return new JoinGameResponse(gameId, state);
         }
-        async public Task LeaveGameAsync(AppDbContext db, Guid gameId, Guid playerId, CancellationToken ct)
+        async public Task DisconnectProtocolAsync(Guid gameId, Guid playerId, CancellationToken ct)
         {
-            //mark player as left
-            db.Find<Player>(playerId)!.IsConnected = false;
-            await db.SaveChangesAsync(ct);
+            //mark player as disconnected
+            var player = _db.Find<Player>(playerId);
+            if (player is null) throw new Exception("Player not found when disconnecting");
+            player.IsConnected = false;
+            await _db.SaveChangesAsync(ct);
         }
-        //find overdue turns
-        async public Task<List<(Guid gameId, Guid turnId)>> FindOverdueAsync(AppDbContext db, CancellationToken ct)
+        async public Task<List<PlayerState>> LeaveGameAsync(Guid gameId, Guid playerId, CancellationToken ct)
         {
-            var now = DateTime.UtcNow;
-            return await db.Turns
-              .Where(t => t.EndedAt == null && t.StartedAt.AddSeconds(t.DurationSec) <= now)
-              .Select(t => new { t.GameId, t.Id })
-              .AsNoTracking()
-              .ToListAsync(ct)
-              .ContinueWith(t => t.Result.Select(x => (x.GameId, x.Id)).ToList(), ct);
+            Player player = _db.Find<Player>(playerId) ?? throw new Exception("Player not found when leaving game");
+            Game game = _db.Find<Game>(gameId) ?? throw new Exception("Game not found when leaving game");
+            game.Players.Remove(player);
+
+            await _db.SaveChangesAsync(ct);
+            return game.Players
+                .OrderBy(p => p.Seat)
+                .Select(p => new PlayerState(p.Id, p.Seat, p.IsActive, p.IsConnected, p.IsHost, p.Name, p.IconUrl, p.RoundWins, p.LastWord, p.LastWordLength))
+                .ToList();
         }
         //Timeout and advance turn
-        async public Task TimeoutAndAdvanceAsync(AppDbContext db, Guid gameId, Guid turnId, CancellationToken ct)
+        async public Task TimeoutAndAdvanceAsync(Guid gameId, Guid turnId, CancellationToken ct)
         {
             // in IGameService.TimeoutAndAdvanceAsync
             var affected = await _db.Turns

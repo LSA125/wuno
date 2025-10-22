@@ -21,12 +21,12 @@ namespace Wuno.Api.Hubs
         public async Task ConnectToGame(string gameCode, CancellationToken ct)
         {
             Guid gameId = await _svc.GetGameId(gameCode, ct);
-            _tracker.Add(Context.ConnectionId, $"game:{gameId}");
+            _tracker.Add(Context.ConnectionId, gameId);
             await Groups.AddToGroupAsync(Context.ConnectionId, $"game:{gameId}", ct);
         }
         public async Task LeaveGame(Guid gameid, CancellationToken ct)
         {
-            _tracker.Remove(Context.ConnectionId, $"game:{gameid}");
+            _tracker.Remove(Context.ConnectionId, gameid);
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"game:{gameid}", ct);
         }
 
@@ -34,7 +34,8 @@ namespace Wuno.Api.Hubs
         {
             _tracker.GetGroups(Context.ConnectionId).ToList().ForEach(async group =>
             {
-                await Clients.Group(group).SendAsync("PlayerDisconnected", Context.ConnectionId);
+                List<Player> players = await _svc.GetPlayers(group, CancellationToken.None);
+                await Clients.Group($"game:{group}").SendAsync("PlayerDisconnected", Context.ConnectionId);
             });
             _tracker.Clear(Context.ConnectionId);
             await base.OnDisconnectedAsync(exception);
@@ -44,7 +45,7 @@ namespace Wuno.Api.Hubs
         {
             await _svc.ReadyAsync(gameId, seat, isReady, ct);
             List<Player> players = await _svc.GetPlayers(gameId, ct);
-            await _hub.Clients.Group($"game:{gameId}").SendAsync("PlayerReady", players, ct);
+            await _hub.Clients.Group($"game:{gameId}").SendAsync("PlayerState", players, ct);
         }
 
         public async Task SubmitWord(Guid gameId, int seat, string word, CancellationToken ct)
