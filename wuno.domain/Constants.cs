@@ -9,6 +9,7 @@ namespace wuno.domain
     public static class Constants
     {
         public const int DEFAULT_START_LEN = 1;
+        public const int DEFAULT_TIME_DECREASE_PER_TURN_SEC = 5;
         public const int MIN_TURN_DUR_SEC = 5;
         public const int MAX_TURN_DUR_SEC = 120;
         public const int DEFAULT_TURN_DUR_SEC = 30;

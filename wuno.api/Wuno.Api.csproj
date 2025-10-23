@@ -21,4 +21,8 @@
     <ProjectReference Include="..\wuno.infrastructure\Wuno.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Background\" />
+  </ItemGroup>
+
 </Project>

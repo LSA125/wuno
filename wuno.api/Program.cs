@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using System;
 using wuno.infrastructure;
-using Wuno.Api.Background;
 using Wuno.Api.Hubs;
 using Wuno.Application.Games;
 
@@ -27,7 +26,6 @@ builder.Services.AddRateLimiter(opts => {
         o.QueueLimit = 0;
     });
 });
-builder.Services.AddHostedService<TurnSweeper>();
 builder.Services.AddSignalR();
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();

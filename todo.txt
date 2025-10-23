@@ -1,5 +1,3 @@
 Continue implementing hub functionality.
 
-Fix effects applying across different rounds.
-
-Add round and turn tracking logic.
+Make sure round/game end functionality only needs gameid
