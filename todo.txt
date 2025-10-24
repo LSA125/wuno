@@ -1,3 +1,5 @@
 Continue implementing hub functionality.
 
-Make sure round/game end functionality only needs gameid
+Make User Have to send turn and round id when submitting word.
+
+Make updating the word have a update rate limit, and verify its the right seat.

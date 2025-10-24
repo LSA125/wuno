@@ -59,12 +59,15 @@ namespace Wuno.Api.Hubs
                 await _hub.Clients.Group($"game:{gameId}").SendAsync("PlayerState", _svc.GetPlayersAsync(gameId,ct), ct);
             }
         }
-        public async Task SubmitWord(Guid gameId, int seat, string word, CancellationToken ct)
+        public async Task SubmitWord(Guid gameId, Guid turnId, int seat, string word, CancellationToken ct)
         {
             SubmitWordResponse res = await _svc.SubmitWordAsync(gameId, new SubmitWordRequest(seat, word), ct);
             if (res.Ok)
             {
-                if (_svc.IsRoundEndAsync(gameId).Result)
+                if (_svc.IsRoundEndAsync(gameId, turnId, ct).Result)
+                {
+
+                }
                 var state = await _svc.GetGameStateAsync(gameId, ct);
                 await _hub.Clients.Group($"game:{gameId}").SendAsync("GameUpdated", state, ct);
             }

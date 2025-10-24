@@ -119,7 +119,7 @@ namespace Wuno.Application.Games
                 .Include(g => g.Players)
                 .AnyAsync(g => g.Id == gameId && g.Players.Count(p => p.IsActive) <= 1, ct);
         }
-        public async Task EndRoundAsync(Guid gameId, CancellationToken ct)
+        public async Task EndRoundAsync(Guid gameId, Guid roundId, CancellationToken ct)
         {
             Round round = await _db.Rounds
               .Include(r => r.Game)
@@ -160,6 +160,19 @@ namespace Wuno.Application.Games
             if (turn is null) throw new Exception("Turn not found");
             return new TurnState(turn.Id, turn.Index, turn.Seat, turn.StartedAt, 
                                     turn.DurationSec, turn.MinLen, turn.FreeStart, turn.Require2Vowels);
+        }
+        public async Task<(Guid turnId, int seat, DateTime dueAt)?> GetCurrentTurnInfoAsync(Guid gameId, CancellationToken ct)
+        {
+            var dto = await _db.Turns
+                .AsNoTracking()
+                .Where(t => t.GameId == gameId && t.EndedAt == null)
+                .OrderByDescending(t => t.Index)
+                .Select(t => new { t.Id, t.Seat, t.StartedAt, t.DurationSec }) // SQL-friendly
+                .FirstOrDefaultAsync(ct);
+
+            return dto is null
+                ? ((Guid, int, DateTime)?)null
+                : (dto.Id, dto.Seat, dto.StartedAt.AddSeconds(dto.DurationSec));
         }
         public async Task<GameState> GetGameStateAsync(Guid gameId, CancellationToken ct)
         {
