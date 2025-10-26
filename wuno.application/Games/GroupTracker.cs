@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Wuno.Application.Games
 {
-    public sealed class GroupTracker
+    public sealed class GroupTracker : IGroupTracker
     {
         private readonly ConcurrentDictionary<string, HashSet<Guid>> _map = new();
         public void Add(string connectionId, Guid group)

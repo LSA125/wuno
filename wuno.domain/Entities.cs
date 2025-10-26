@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace wuno.domain
 {
@@ -66,6 +62,11 @@ namespace wuno.domain
         public Guid Id { get; init; } = Guid.NewGuid();
         public Guid GameId { get; set; }
         public Guid RoundId { get; set; }
+        public Game Game { get; set; } = null!;
+        public Round Round { get; set; } = null!;
+
+        [Timestamp]
+        public byte[] RowVersion { get; set; } = default!;
         public int Index { get; set; }
         public int Seat { get; set; }
         public char? StartLetter { get; set; } // null = any / free-start
@@ -74,13 +75,11 @@ namespace wuno.domain
         public bool FreeStart { get; set; }
         public DateTime StartedAt { get; set; }
         public int DurationSec { get; set; }
+        public DateTime DueAt { get; set; }
         public string? Word { get; set; }
         public int? WordLen { get; set; }
         public DateTime? EndedAt { get; set; }
         public TurnEndReason? EndReason { get; set; }
-
-        public Game Game { get; set; } = null!;
-        public Round Round { get; set; } = null!;
     }
     public sealed class Effect
     {

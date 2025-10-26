@@ -26,11 +26,5 @@ namespace Wuno.Api.Controllers
             var state = await _svc.GetGameStateAsync(id, ct);
             return state is null ? NotFound() : Ok(state);
         }
-        [HttpPost("games/{id:guid}/submit")]
-        public async Task<IActionResult> Submit(Guid id, [FromBody] SubmitWordRequest req, CancellationToken ct)
-        {
-            var res = await _svc.SubmitWordAsync(id, req, ct);
-            return Ok(res);
-        }
     }
 }

@@ -7,10 +7,10 @@ using System.Threading.Tasks;
 
 namespace Wuno.Application.Games
 {
-    public sealed class TypingGate
+    public sealed class TypingGate : ITypingGate
     {
         private readonly ConcurrentDictionary<string, long> _lastTicks = new();
-        public bool TryAllow(string key, TimeSpan interval)
+        public bool tryAllow(string key, TimeSpan interval)
         {
             var nowTicks = DateTime.UtcNow.Ticks;
             var intervalTicks = interval.Ticks;

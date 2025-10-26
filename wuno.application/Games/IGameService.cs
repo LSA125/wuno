@@ -15,19 +15,19 @@ namespace Wuno.Application.Games
         Task<bool> AreAllPlayersReadyAsync(Guid gameId, CancellationToken ct);
         Task<NewGameResponse> StartNewGameAsync(NewGameRequest req, CancellationToken ct);
         Task<TurnState> StartMatchAsync(Guid gameId, CancellationToken ct);
-        Task<bool> IsMatchEndAsync(Guid gameId, Guid playerId, CancellationToken ct);
+        Task<bool> IsMatchEndAsync(Guid gameId, CancellationToken ct);
         Task EndMatchAsync(Guid gameId, CancellationToken ct);
         Task<TurnState> StartRoundAsync(Guid gameId, CancellationToken ct);
-        Task<bool> IsRoundEndAsync(Guid gameId, Guid roundId, CancellationToken ct);
-        Task EndRoundAsync(Guid gameId, Guid roundId, Guid winnerId, CancellationToken ct);
+        Task<bool> IsRoundEndAsync(Guid gameId, CancellationToken ct);
+        Task EndRoundAsync(Guid gameId, Guid roundId, CancellationToken ct);
         Task<List<PlayerState>> GetPlayersAsync(Guid gameId, CancellationToken ct);
         Task<RoundState> GetRoundAsync(Guid roundId, CancellationToken ct);
         Task<TurnState> GetTurnAsync(Guid turnId, CancellationToken ct);
         Task<GameState> GetGameStateAsync(Guid gameId, CancellationToken ct); // compact state for UI
-        Task<SubmitWordResponse> SubmitWordAsync(Guid gameId, SubmitWordRequest req, CancellationToken ct);
+        Task<SubmitWordResponse> SubmitWordAsync(Guid gameId, Guid roundId, Guid turnId, SubmitWordRequest req, CancellationToken ct);
         TurnState StartTurn(Game game, Round round, char? prevAcceptedLetter, CancellationToken ct);
         Task<JoinGameResponse> JoinGameAsync(Guid gameId, Guid userId, CancellationToken ct);
-        Task DisconnectProtocolAsync(Guid gameId, Guid playerId, CancellationToken ct);
+        Task<(Guid gameId, List<PlayerState> players)> DisconnectProtocolAsync(Guid playerId, CancellationToken ct);
         Task LeaveGameAsync(Guid gameId, Guid playerId, CancellationToken ct);
         //true if advanced
         Task<bool> TimeoutAndAdvanceAsync(Guid gameId, Guid turnId, CancellationToken ct);

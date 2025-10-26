@@ -9,11 +9,11 @@ using wuno.infrastructure;
 
 #nullable disable
 
-namespace wuno.infrastructure.Migrations
+namespace Wuno.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251012222457_AddUserTable")]
-    partial class AddUserTable
+    [Migration("20251026071409_CodeCantBeEmpty")]
+    partial class CodeCantBeEmpty
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -34,6 +34,9 @@ namespace wuno.infrastructure.Migrations
                     b.Property<int>("AppliesOn")
                         .HasColumnType("int");
 
+                    b.Property<Guid?>("ConsumedTurnId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -41,6 +44,12 @@ namespace wuno.infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("PlayerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("RoundId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("SourceTurnId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<int>("Type")
@@ -53,6 +62,10 @@ namespace wuno.infrastructure.Migrations
 
                     b.HasIndex("GameId");
 
+                    b.HasIndex("PlayerId");
+
+                    b.HasIndex("RoundId");
+
                     b.ToTable("Effects");
                 });
 
@@ -64,7 +77,7 @@ namespace wuno.infrastructure.Migrations
 
                     b.Property<string>("Code")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -82,6 +95,10 @@ namespace wuno.infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasFilter("[Status] <> 2 AND [Code] IS NOT NULL AND CODE <> ''");
 
                     b.ToTable("Games");
                 });
@@ -109,9 +126,6 @@ namespace wuno.infrastructure.Migrations
 
                     b.Property<string>("LastWord")
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("LastWordLength")
-                        .HasColumnType("int");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -175,6 +189,9 @@ namespace wuno.infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTime>("DueAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<int>("DurationSec")
                         .HasColumnType("int");
 
@@ -201,6 +218,12 @@ namespace wuno.infrastructure.Migrations
 
                     b.Property<Guid>("RoundId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<int>("Seat")
                         .HasColumnType("int");
@@ -267,7 +290,23 @@ namespace wuno.infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("wuno.domain.Player", "Player")
+                        .WithMany()
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("wuno.domain.Round", "Round")
+                        .WithMany()
+                        .HasForeignKey("RoundId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Game");
+
+                    b.Navigation("Player");
+
+                    b.Navigation("Round");
                 });
 
             modelBuilder.Entity("wuno.domain.Player", b =>

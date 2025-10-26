@@ -10,75 +10,104 @@ namespace Wuno.Api.Hubs
         private readonly IGameService _svc;
         private readonly IHubContext<GameHub> _hub;
         private readonly IGroupTracker _tracker;
-
-        public GameHub(IGameService svc, IHubContext<GameHub> hub, IGroupTracker tracker)
+        private readonly ITypingGate _typingGate;
+        private readonly ITurnTimer _turnTimer;
+        public GameHub(IGameService svc, IHubContext<GameHub> hub, IGroupTracker tracker, ITypingGate typingGate, ITurnTimer turnTimer)
         {
             _svc = svc;
             _hub = hub;
             _tracker = tracker;
+            _typingGate = typingGate;
+            _turnTimer = turnTimer;
         }
-        public async Task ConnectToGame(string gameCode, CancellationToken ct)
+        public async Task ConnectToGame(string gameCode, Guid userId, CancellationToken ct)
         {
             Guid gameId = await _svc.GetGameId(gameCode, ct);
-            _tracker.Add(Context.ConnectionId, gameId);
+            var res = await _svc.JoinGameAsync(gameId, userId, ct);
+            _tracker.Add(Context.ConnectionId, res.PlayerId);
             await Groups.AddToGroupAsync(Context.ConnectionId, $"game:{gameId}", ct);
+            await Clients.Caller.SendAsync("ConnectedToGame", res, ct);
+            await Clients.Group($"game:{gameId}").SendAsync("PlayersUpdated", res.State.Players, ct);
         }
-        public async Task LeaveGame(Guid gameid, CancellationToken ct)
+        public async Task LeaveGame(Guid gameId, Guid playerId, CancellationToken ct)
         {
-            _tracker.Remove(Context.ConnectionId, gameid);
-            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"game:{gameid}", ct);
+            _tracker.Remove(Context.ConnectionId, gameId);
+            await _svc.LeaveGameAsync(gameId, playerId, ct);
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"game:{gameId}", ct);
         }
-        public async override Task OnDisconnectedAsync(Exception? exception)
+        public override async Task OnDisconnectedAsync(Exception? exception)
         {
-            _tracker.GetGroups(Context.ConnectionId).ToList().ForEach(async group =>
+            var tasks = _tracker.GetGroups(Context.ConnectionId).Select(async playerId =>
             {
-                List<PlayerState> players = await _svc.GetPlayersAsync(group, CancellationToken.None);
-                await Clients.Group($"game:{group}").SendAsync("PlayerDisconnected", Context.ConnectionId);
+                var res = await _svc.DisconnectProtocolAsync(playerId, CancellationToken.None);
+                await Clients.Group($"game:{res.gameId}").SendAsync("PlayerDisconnected", res.players);
             });
+
+            await Task.WhenAll(tasks);
             _tracker.Clear(Context.ConnectionId);
             await base.OnDisconnectedAsync(exception);
         }
         public async Task Ready(Guid gameId, int seat, bool isReady, CancellationToken ct)
         {
             await _svc.ReadyAsync(gameId, seat, isReady, ct);
-            if (_svc.AreAllPlayersReadyAsync(gameId, ct).Result)
+
+            if (await _svc.AreAllPlayersReadyAsync(gameId, ct))
             {
-                TurnState turn = await _svc.StartMatchAsync(gameId, ct);
-                await _hub.Clients.Group($"game:{gameId}").SendAsync("MatchStarted", _svc.GetGameStateAsync(gameId, ct),ct);
-                var _ = Task.Delay(turn.DurationSec * 1000, ct).ContinueWith(async _ =>
-                {
-                    if (await _svc.TimeoutAndAdvanceAsync(gameId, turn.TurnId, ct))
-                    {
-                        var state = await _svc.GetGameStateAsync(gameId, ct);
-                        await _hub.Clients.Group($"game:{gameId}").SendAsync("GameUpdated", state, ct);
-                    }
-                }, ct);
+                var turn = await _svc.StartMatchAsync(gameId, ct);
+                var state = await _svc.GetGameStateAsync(gameId, ct);
+                await _hub.Clients.Group($"game:{gameId}").SendAsync("MatchStarted", state, ct);
+                _turnTimer.Schedule(gameId, turn.TurnId, turn.DueAt, BroadcastAfterTimeout);
             }
             else
             {
-                await _hub.Clients.Group($"game:{gameId}").SendAsync("PlayerState", _svc.GetPlayersAsync(gameId,ct), ct);
+                var players = await _svc.GetPlayersAsync(gameId, ct);
+                await _hub.Clients.Group($"game:{gameId}").SendAsync("PlayersUpdated", players, ct);
             }
         }
-        public async Task SubmitWord(Guid gameId, Guid turnId, int seat, string word, CancellationToken ct)
+        public async Task SubmitWord(Guid gameId, Guid roundId, Guid turnId, int seat, string word, CancellationToken ct)
         {
-            SubmitWordResponse res = await _svc.SubmitWordAsync(gameId, new SubmitWordRequest(seat, word), ct);
-            if (res.Ok)
-            {
-                if (_svc.IsRoundEndAsync(gameId, turnId, ct).Result)
-                {
-
-                }
-                var state = await _svc.GetGameStateAsync(gameId, ct);
-                await _hub.Clients.Group($"game:{gameId}").SendAsync("GameUpdated", state, ct);
-            }
-            else
+            var res = await _svc.SubmitWordAsync(gameId, roundId, turnId, new SubmitWordRequest(seat, word), ct);
+            if (!res.Ok)
             {
                 await Clients.Caller.SendAsync("WordRejected", res.Reason, ct);
+                return;
             }
+
+            _turnTimer.Cancel(turnId);
+
+            if (await _svc.IsRoundEndAsync(gameId, ct))
+            {
+                await _svc.EndRoundAsync(gameId, roundId, ct);
+                var afterRound = await _svc.GetGameStateAsync(gameId, ct);
+                await _hub.Clients.Group($"game:{gameId}").SendAsync("RoundEnded", afterRound, ct);
+
+                await Task.Delay(3000, ct);
+                if (await _svc.IsMatchEndAsync(gameId, ct))
+                {
+                    await _svc.EndMatchAsync(gameId, ct);
+                    var ended = await _svc.GetGameStateAsync(gameId, ct);
+                    await _hub.Clients.Group($"game:{gameId}").SendAsync("MatchEnded", ended, ct);
+                    return;
+                }
+
+                var turn = await _svc.StartRoundAsync(gameId, ct);
+                var afterNewRound = await _svc.GetGameStateAsync(gameId, ct);
+                await _hub.Clients.Group($"game:{gameId}").SendAsync("NewRoundStarted", afterNewRound, ct);
+                _turnTimer.Schedule(gameId, turn.TurnId, turn.DueAt, BroadcastAfterTimeout);
+            }
+
+            var state = await _svc.GetGameStateAsync(gameId, ct);
+            await _hub.Clients.Group($"game:{gameId}").SendAsync("GameUpdated", state, ct);
         }
         public async Task WordChanged(string word, CancellationToken ct)
         {
             await Clients.Caller.SendAsync("WordChanged", word, ct);
+        }
+
+        private async Task BroadcastAfterTimeout(Guid gameId, Guid turnId)
+        {
+            var state = await _svc.GetGameStateAsync(gameId, CancellationToken.None);
+            await _hub.Clients.Group($"game:{gameId}").SendAsync("GameUpdated", state);
         }
     }
 }
