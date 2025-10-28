@@ -1,6 +1,4 @@
 ﻿using Microsoft.AspNetCore.SignalR;
-using System.Runtime.InteropServices;
-using wuno.domain;
 using Wuno.Application.Games;
 
 namespace Wuno.Api.Hubs

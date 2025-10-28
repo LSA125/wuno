@@ -14,7 +14,8 @@ namespace Wuno.Application.Games
     public sealed class GameService : IGameService
     {
         private readonly AppDbContext _db;
-        public GameService(AppDbContext db) { _db = db; }
+        private readonly IWordList _wl;
+        public GameService(AppDbContext db, IWordList wl) { _db = db; _wl = wl; }
 
         public async Task<Guid> GetGameId(string code, CancellationToken ct)
         {
@@ -232,7 +233,7 @@ namespace Wuno.Application.Games
 
             // validate request word (pure function calls)
             var w = req.Word ?? "";
-            if (!Words.IsWord(w)) return new(false, "Not a valid word");
+            if (!_wl.IsWord(w)) return new(false, "Not a valid word");
             // ... other validations ...
 
             // atomically accept the word (gate)

@@ -7,11 +7,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="MailKit" Version="4.14.1" />
+    <PackageReference Include="Microsoft.Extensions.Identity.Core" Version="9.0.10" />
+    <PackageReference Include="MimeKit" Version="4.14.0" />
     <PackageReference Include="TypeGen" Version="6.0.3" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\wuno.infrastructure\Wuno.Infrastructure.csproj" />
   </ItemGroup>
-
+  
+  <ItemGroup>
+    <EmbeddedResource Include="Games\words.txt" />
+  </ItemGroup>
 </Project>

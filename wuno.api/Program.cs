@@ -4,6 +4,7 @@ using System;
 using wuno.infrastructure;
 using Wuno.Api.Hubs;
 using Wuno.Application.Games;
+using Wuno.Application.Users;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,6 +17,12 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<AppDbContext>(opt =>
   opt.UseSqlServer(builder.Configuration.GetConnectionString("Default")));
 builder.Services.AddScoped<IGameService, GameService>();
+builder.Services.AddScoped<IUserService, NoEmailUserService>();
+builder.Services.AddSingleton<IEmailSender, EmailSender>();
+builder.Services.AddSingleton<ITypingGate, TypingGate>();
+builder.Services.AddSingleton<ITurnTimer, TurnTimer>();
+builder.Services.AddSingleton<IGroupTracker, GroupTracker>();
+builder.Services.AddSingleton<IWordList, WordList>();
 builder.Services.AddControllers().AddJsonOptions(o => {
     o.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
 });
@@ -26,6 +33,7 @@ builder.Services.AddRateLimiter(opts => {
         o.QueueLimit = 0;
     });
 });
+
 builder.Services.AddSignalR();
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();

@@ -7,12 +7,26 @@ namespace wuno.domain
         public Guid Id { get; init; } = Guid.NewGuid();
         public string Name { get; set; } = "";
         public string? IconUrl { get; set; }
+
         public string? Email { get; set; }
+        public string? EmailNormalized { get; set; }
+        public DateTime? EmailVerifiedAt { get; set; }
+
         public string? PasswordHash { get; set; }
         public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
         public DateTime LastActiveAt { get; set; } = DateTime.UtcNow;
+
         public Guid? ActivePlayerId { get; set; }
         public Player? ActivePlayer { get; set; }
+    }
+    public sealed class EmailVerificationToken
+    {
+        public Guid Id { get; init; } = Guid.NewGuid();
+        public Guid UserId { get; set; }
+        public User User { get; set; } = default!;
+        public string TokenHash { get; set; } = default!;
+        public DateTime ExpiresAt { get; init; }
+        public DateTime UsedAt { get; set; }
     }
     public sealed class Game
     {

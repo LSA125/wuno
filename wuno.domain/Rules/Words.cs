@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-
 namespace wuno.domain.Rules
 {
     public static class Words
@@ -29,7 +28,6 @@ namespace wuno.domain.Rules
             return A.OrderBy(c => c).SequenceEqual(B.OrderBy(c => c));
         }
         public static int VowelCount(string w) => Normalize(w).Count(c => Vowels.Contains(c));
-        public static bool IsWord(string w) => Normalize(w).Length >= 2; // swap for real dict later
         public static int ReverseMatchLength(string first, string second)
         {
             var A = Normalize(first); var B = Normalize(second);

@@ -12,6 +12,7 @@ namespace wuno.infrastructure
         public DbSet<Turn> Turns => Set<Turn>();
         public DbSet<Effect> Effects => Set<Effect>();
         public DbSet<User> Users => Set<User>();
+        public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
 
         protected override void OnModelCreating(ModelBuilder b)
         {
@@ -22,6 +23,7 @@ namespace wuno.infrastructure
             b.Entity<User>().HasOne(u => u.ActivePlayer).WithOne(p => p.User).HasForeignKey<Player>(p => p.UserId).OnDelete(DeleteBehavior.SetNull);
             b.Entity<Effect>().HasOne(e => e.Round).WithMany().OnDelete(DeleteBehavior.Restrict);
             b.Entity<Effect>().HasOne(e => e.Player).WithMany().OnDelete(DeleteBehavior.Restrict);
+            b.Entity<EmailVerificationToken>().HasOne(t => t.User).WithMany().HasForeignKey(t => t.UserId).OnDelete(DeleteBehavior.Cascade);
 
             b.Entity<Turn>().HasOne(t => t.Round).WithMany().HasForeignKey(t => t.RoundId).OnDelete(DeleteBehavior.Restrict);
 
@@ -30,6 +32,9 @@ namespace wuno.infrastructure
             b.Entity<Player>().HasIndex(p => new { p.GameId, p.Seat }).IsUnique();
             b.Entity<Round>().HasIndex(r => new { r.GameId, r.Index });
             b.Entity<Turn>().HasIndex(t => new { t.GameId, t.Index });
+            b.Entity<User>().HasIndex(u => u.EmailNormalized).IsUnique().HasFilter("[EmailNormalized] IS NOT NULL AND [EmailNormalized] <> ''");
+            b.Entity<User>().HasIndex(u => u.Name).IsUnique().HasFilter("[Name] IS NOT NULL AND [Name] <> ''");
+            b.Entity<EmailVerificationToken>().HasIndex(t => new {t.UserId, t.TokenHash}).IsUnique();
 
             b.Entity<Turn>().Property(t => t.RowVersion).IsRowVersion();
         }
