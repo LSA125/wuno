@@ -8,7 +8,9 @@ using wuno.domain.Rules;
 
 namespace Wuno.Application.Games
 {
-    public record UserResponse(bool Ok, Guid? UserId, string? Name, string? IconUrl);
+    public record TmpUserRequest(Guid UserId, string Name, string? IconUrl, string? Email);
+    public record RegUserRequest(Guid UserId, string Pass, string? Name, string? IconUrl, string? Email);
+    public record UserResponse(bool Ok, Guid? UserId, string? Name, string? IconUrl, string? Email, string? Msg);
     public record NewGameRequest(int PlayerCount, int TargetWins);
     public record NewGameResponse(Guid GameId,int NextSeat, int PlayerCount, int TargetWins);
     public record ErrorResponse(string code, string Reason);

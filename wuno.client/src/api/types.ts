@@ -1,0 +1,11 @@
+export type TmpUserRequest = { userId?: string; name: string; iconUrl?: string | null; email?: string | null };
+export type RegUserRequest = { userId: string; pass: string; name?: string | null; iconUrl?: string | null; email?: string | null };
+export type UserResponse = { ok: boolean; userId?: string | null; name?: string | null; iconUrl?: string | null; email?: string | null; msg?: string | null };
+export type NewGameRequest = { playerCount: number; targetWins: number };
+export type NewGameResponse = { gameId: string; nextSeat: number; playerCount: number; targetWins: number };
+export type PlayerState = { playerId: string; seat: number; isActive: boolean; isConnected: boolean; isHost: boolean; name: string; iconUrl?: string | null; roundWins: number; lastWord?: string | null };
+export type TurnState = { turnId: string; index: number; seat: number; startedAt: string; durationSec: number; dueAt: string; minLen: number; freeStart: boolean; req2Vowels: boolean };
+export type RoundState = { roundId: string; index: number; active: boolean; winnerId?: string | null; startedAt?: string | null; endedAt?: string | null };
+export type GameState = { gameId: string; status: number; nextSeat: number; direction: number; targetWins: number; players: PlayerState[]; currentRound: RoundState; currentTurn: TurnState };
+export type JoinGameResponse = { playerId: string; state: GameState };
+export type SubmitWordResponse = { ok: boolean; reason?: string };

@@ -5,6 +5,7 @@ import fs from 'fs'
 import path from 'node:path'
 import child_process from 'child_process'
 import { env } from 'process'
+import tailwindcss from '@tailwindcss/vite'
 
 const baseFolder =
     env.APPDATA !== undefined && env.APPDATA !== ''
@@ -38,15 +39,13 @@ const target = env.ASPNETCORE_HTTPS_PORT ? `https://localhost:${env.ASPNETCORE_H
 
 // https://vite.dev/config/
 export default defineConfig({
-    plugins: [react()],
+    plugins: [react(), tailwindcss(),],
     resolve: {
-        alias: {
-            '@': fileURLToPath(new URL('./src', import.meta.url))
-        }
+        alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) }
     },
     server: {
         proxy: {
-            '/hubs': { target, ws: true, secure: false, changeOrigin: true },
+            '/hubs/game': { target, ws: true, secure: false, changeOrigin: true },
             '/api': { target, secure: false, changeOrigin: true },
         },
         port: 5173,

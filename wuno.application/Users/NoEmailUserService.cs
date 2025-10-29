@@ -1,62 +1,195 @@
 ﻿using Microsoft.AspNetCore.Identity;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using System.Threading;
 using wuno.domain;
 using wuno.infrastructure;
 using Wuno.Application.Games;
-using Wuno.Domain.Rules;
+using Wuno.Domain.Rules; // if you already have Email.NormalizeEmail
 
 namespace Wuno.Application.Users
 {
-    public class NoEmailUserService : IUserService
+    public sealed class NoEmailUserService : IUserService
     {
-        AppDbContext _db;
-        public NoEmailUserService(AppDbContext db)
+        private readonly AppDbContext _db;
+        private readonly PasswordHasher<User> _hasher = new();
+
+        public NoEmailUserService(AppDbContext db) => _db = db;
+
+        // Get a user by cookie token (Guid). If not found, return "not found" shape.
+        public async Task<UserResponse> GetUserAsync(Guid userId, CancellationToken ct)
         {
-            _db = db;
-        }
-        public Task<UserResponse> GetUserAsync(Guid userId, CancellationToken ct)
-        {
-            var user = _db.Users.Find(userId);
+            var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId, ct);
             if (user == null)
             {
-                return Task.FromResult( new UserResponse(false, null, null, null));
+                return new UserResponse(false, null, null, null, null, "User not Found");
             }
-            return Task.FromResult(new UserResponse(true, user.Id, user.Name, user.IconUrl));
+            user.LastActiveAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync(ct);
+            return new UserResponse(true, user.Id, user.Name, user.IconUrl, user.Email, null);
         }
-        public Task<UserResponse> CreateUserAsync(string name, string? icon, string? email, CancellationToken ct)
+
+        // Create a new (initially anonymous) user. Email is optional and NOT verified here.
+        public async Task<UserResponse> CreateUserAsync(string name, string? icon, string? email, CancellationToken ct)
         {
-            User user = new User
+            var emailNorm = Email.NormalizeEmail(email);
+
+            // Optional uniqueness check for email if provided
+            if (!string.IsNullOrWhiteSpace(emailNorm))
+            {
+                var emailInUse = await _db.Users.AnyAsync(u => u.EmailNormalized == emailNorm, ct);
+                if (emailInUse)
+                    return new UserResponse(false, null, null, null, null, "Email is already in use.");
+            }
+
+            var user = new User
             {
                 Id = Guid.NewGuid(),
-                Name = name,
-                IconUrl = icon,
-                Email = email,
-                EmailNormalized = Email.NormalizeEmail(email),
+                Name = name?.Trim() ?? "",
+                IconUrl = string.IsNullOrWhiteSpace(icon) ? null : icon!.Trim(),
+                Email = string.IsNullOrWhiteSpace(email) ? null : email!.Trim(),
+                EmailNormalized = emailNorm,
+                LastActiveAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
             };
+
             _db.Users.Add(user);
-            _db.SaveChanges();
-            return Task.FromResult(new UserResponse(true, user.Id, user.Name, user.IconUrl));
+            await _db.SaveChangesAsync(ct);
+
+            return new UserResponse(true, user.Id, user.Name, user.IconUrl, user.Email, null);
         }
 
-        public Task<UserResponse> RegisterAccountAsync(Guid userId, string username, string password, string? email, string? iconUrl, CancellationToken ct)
+        // Upgrade an existing anonymous user (by Guid) into a registered account.
+        // Still no email verification; we just persist email if provided (unique when present).
+        public async Task<UserResponse> RegisterAccountAsync(
+            Guid userId,
+            string username,
+            string password,
+            string? email,
+            string? iconUrl,
+            CancellationToken ct)
         {
-            User? user = _db.Users.Find(userId);
-            if (user == null)
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
+            if (user is null)
+                return new UserResponse(false, null, null, null, null, "User not Found");
+
+            // If already registered (has a password), treat as idempotent “already registered”.
+            if (!string.IsNullOrEmpty(user.PasswordHash))
+                return new UserResponse(true, user.Id, user.Name, user.IconUrl, user.Email, null);
+
+            // Basic validation
+            if (string.IsNullOrWhiteSpace(username))
+                return new UserResponse(false, null, null, null, null, "Username is required.");
+            if (string.IsNullOrWhiteSpace(password))
+                return new UserResponse(false, null, null, null, null, "Password is required.");
+
+            // Optional email path
+            var emailNorm = Email.NormalizeEmail(email);
+            if (!string.IsNullOrWhiteSpace(emailNorm))
             {
-                return Task.FromResult(new UserResponse(false, null, null, null));
+                // Enforce uniqueness when provided
+                var emailInUse = await _db.Users.AnyAsync(u => u.EmailNormalized == emailNorm && u.Id != user.Id, ct);
+                if (emailInUse)
+                    return new UserResponse(false, null, null, null, null, "Email is already in use.");
+                user.Email = email!.Trim();
+                user.EmailNormalized = emailNorm;
             }
-            var passwordHasher = new PasswordHasher
-            user.Name = username;
-            user.PasswordHash = 
+
+            // Optional: ensure username uniqueness if you need it
+            var nameInUse = await _db.Users.AnyAsync(u => u.Name == username && u.Id != user.Id, ct);
+            if (nameInUse)
+                return new UserResponse(false, null, null, null, null, "Username is already in use.");
+
+            user.Name = username.Trim();
+            user.IconUrl = string.IsNullOrWhiteSpace(iconUrl) ? user.IconUrl : iconUrl!.Trim();
+            user.PasswordHash = _hasher.HashPassword(user, password);
+            user.LastActiveAt = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync(ct);
+
+            return new UserResponse(true, user.Id, user.Name, user.IconUrl, user.Email, null);
+        }
+        public async Task<UserResponse> EditRegisteredUserAsync(Guid userId, 
+            string pass, 
+            string? newName, 
+            string? newIconUrl, 
+            string? newEmail, 
+            CancellationToken ct)
+        {
+            User? user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
+            if (user is null)
+                return new UserResponse(false, null, null, null, null, "User not Found");
+            if (user.PasswordHash is null)
+                return new UserResponse(false, null, null, null, null, "Cannot edit an anonymous user with this method.");
+            // Verify password
+            var verificationResult = _hasher.VerifyHashedPassword(user, user.PasswordHash, pass);
+            if (verificationResult == PasswordVerificationResult.Failed)
+                return new UserResponse(false, null, null, null, null, "Invalid password.");
+            // Update name if provided
+            if (!string.IsNullOrWhiteSpace(newName))
+            {
+                var nameInUse = await _db.Users.AnyAsync(u => u.Name == newName.Trim() && u.Id != user.Id, ct);
+                if (nameInUse)
+                    return new UserResponse(false, null, null, null, null, "Username is already in use.");
+                user.Name = newName.Trim();
+            }
+            // Update icon URL if provided
+            if (!string.IsNullOrWhiteSpace(newIconUrl))
+            {
+                user.IconUrl = newIconUrl.Trim();
+            }
+            // Update email if provided
+            if (!string.IsNullOrWhiteSpace(newEmail))
+            {
+                var emailNorm = Email.NormalizeEmail(newEmail);
+                // Enforce uniqueness when provided
+                var emailInUse = await _db.Users.AnyAsync(u => u.EmailNormalized == emailNorm && u.Id != user.Id, ct);
+                if (emailInUse)
+                    return new UserResponse(false, null, null, null, null, "Email is already in use.");
+                user.Email = newEmail.Trim();
+                user.EmailNormalized = emailNorm;
+            }
+            await _db.SaveChangesAsync(ct);
+            return new UserResponse(true, user.Id, user.Name, user.IconUrl, user.Email, null);
+        }
+        public async Task<UserResponse> EditAnonUserAsync(Guid userId, string? newName, string? newIconUrl, string? newEmail, CancellationToken ct)
+        {
+            User? user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
+            if (user is null)
+                return new UserResponse(false, null, null, null, null, "User not Found");
+
+            if (user.PasswordHash is not null)
+                return new UserResponse(false, null, null, null, null, "Cannot edit a registered user with this method.");
+
+            // Update name if provided
+            if (!string.IsNullOrWhiteSpace(newName))
+            {
+                var nameInUse = await _db.Users.AnyAsync(u => u.Name == newName.Trim() && u.Id != user.Id, ct);
+                if (nameInUse)
+                    return new UserResponse(false, null, null, null, null, "Username is already in use.");
+                user.Name = newName.Trim();
+            }
+            // Update icon URL if provided
+            if (!string.IsNullOrWhiteSpace(newIconUrl))
+            {
+                user.IconUrl = newIconUrl.Trim();
+            }
+            // Update email if provided
+            if (newEmail is not null)
+            {
+                var emailNorm = Email.NormalizeEmail(newEmail);
+                // Enforce uniqueness when provided
+                var emailInUse = await _db.Users.AnyAsync(u => u.EmailNormalized == emailNorm && u.Id != user.Id, ct);
+                if (emailInUse)
+                    return new UserResponse(false, null, null, null, null, "Email is already in use.");
+                user.Email = newEmail.Trim();
+                user.EmailNormalized = emailNorm;
+            }
+            await _db.SaveChangesAsync(ct);
+            return new UserResponse(true, user.Id, user.Name, user.IconUrl, user.Email, null);
         }
 
+        // No-op for the “NoEmailVerification” service. Keep signature for interface compliance.
         public Task VerifyEmailAsync(Guid token, string verificationCode, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
+            => Task.CompletedTask;
     }
 }
