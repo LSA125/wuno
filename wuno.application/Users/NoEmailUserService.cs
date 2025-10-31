@@ -11,9 +11,13 @@ namespace Wuno.Application.Users
     public sealed class NoEmailUserService : IUserService
     {
         private readonly AppDbContext _db;
-        private readonly PasswordHasher<User> _hasher = new();
+        private readonly IPasswordHasher<User> _hasher;
 
-        public NoEmailUserService(AppDbContext db) => _db = db;
+        public NoEmailUserService(AppDbContext db, IPasswordHasher<User> hasher)
+        {
+            _db = db;
+            _hasher = hasher;
+        }
 
         // Get a user by cookie token (Guid). If not found, return "not found" shape.
         public async Task<UserResponse> GetUserAsync(Guid userId, CancellationToken ct)
@@ -41,6 +45,12 @@ namespace Wuno.Application.Users
                     return new UserResponse(false, null, null, null, null, "Email is already in use.");
             }
 
+            User? matchingName = _db.Users.AsNoTracking().FirstOrDefault(u => u.Name == name);
+            if (matchingName is not null)
+            {
+                return new UserResponse(false, null, null, null, null, "Username is already in use.");
+            }
+
             var user = new User
             {
                 Id = Guid.NewGuid(),
@@ -59,7 +69,6 @@ namespace Wuno.Application.Users
         }
 
         // Upgrade an existing anonymous user (by Guid) into a registered account.
-        // Still no email verification; we just persist email if provided (unique when present).
         public async Task<UserResponse> RegisterAccountAsync(
             Guid userId,
             string username,

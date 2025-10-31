@@ -1,42 +1,38 @@
-import { useEffect, useState } from "react";
-import { getCookie, userCookieKey, setCookie } from "@/auth/cookies";
+// src/components/Lobby/UserGate.tsx
+import { useEffect, useRef } from "react";
+import { getCookie } from "@/auth/cookies";
 import { Api } from "@/api/client";
 import { useUser } from "@/context/UserContext";
-import FirstTimeModal from "./FirstTimeModal";
+import { useNavigate, useLocation } from "react-router-dom";
 
 export default function UserGate() {
-    const { user, setUser } = useUser();
-    const [showFirstTime, setShowFirstTime] = useState(false);
+    const { setUser } = useUser();
+    const nav = useNavigate();
+    const loc = useLocation();
+    const ran = useRef(false);
 
     useEffect(() => {
-        const uid = getCookie();
+        if (ran.current) return;
+        ran.current = true;
+
         (async () => {
-            if (uid) {
-                try {
-                    const profile = await Api.getUser(uid);
-                    setUser(profile);
-                    if (!profile?.ok) setShowFirstTime(true);
-                } catch {
-                    setShowFirstTime(true);
+            const uid = getCookie();
+            if (!uid) {
+                if (loc.pathname !== "/") nav("/", { replace: true });
+                return;
+            }
+            try {
+                const profile = await Api.getUser(uid);
+                if (!profile?.ok) {
+                    if (loc.pathname !== "/") nav("/", { replace: true });
+                    return;
                 }
-            } else {
-                setShowFirstTime(true);
+                setUser(profile); // ok: no nav here
+            } catch {
+                if (loc.pathname !== "/") nav("/", { replace: true });
             }
         })();
-    }, [setUser]);
+    }, []);
 
-    // When a new anon is created, store cookie and user in context
-    const onFirstTimeSuccess = (newId: string, u: any) => {
-        setCookie(newId, 365);
-        setUser(u);
-        setShowFirstTime(false);
-    };
-
-    return (
-        <>
-            {showFirstTime && (
-                <FirstTimeModal open onClose={() => { }} onSuccess={onFirstTimeSuccess} />
-            )}
-        </>
-    );
+    return null;
 }

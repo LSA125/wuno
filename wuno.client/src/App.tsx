@@ -1,5 +1,5 @@
 import { Outlet } from "react-router-dom";
-import Shell from "@/components/Layout/Shell";
+import Shell from "@/components/layout/Shell";
 
 export default function App() {
     return (

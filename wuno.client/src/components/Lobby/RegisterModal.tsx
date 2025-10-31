@@ -1,36 +1,53 @@
+// src/components/Lobby/RegisterModal.tsx
 import { useState } from "react";
-import { Api } from "@/api/client";
+import { useNavigate } from "react-router-dom";
+import { Auth } from "@/api/client";
 import { useUser } from "@/context/UserContext";
-import type { RegUserRequest } from "@/api/types";
+import { getCookie, clearCookie } from "@/auth/cookies";
+import { getPendingJoin } from "@/utils/pendingJoin";
 
 export default function RegisterModal({ open, onClose }: { open: boolean; onClose: () => void; }) {
-    const { user, setUser } = useUser();
-    const [name, setName] = useState(user?.name ?? "");
-    const [email, setEmail] = useState(user?.email ?? "");
-    const [iconUrl, setIconUrl] = useState(user?.iconUrl ?? "");
+    const { setUser } = useUser();
+    const nav = useNavigate();
+    const [username, setUsername] = useState("");
     const [pass, setPass] = useState("");
+    const [email, setEmail] = useState("");
+    const [iconUrl, setIconUrl] = useState("");
     const [busy, setBusy] = useState(false);
     const [err, setErr] = useState<string | null>(null);
 
     const submit = async () => {
-        if (!user?.userId) return;
-        setBusy(true); setErr(null);
+        setErr(null); setBusy(true);
         try {
-            const body: RegUserRequest = {
-                userId: user.userId,
-                pass,
-                name: name || null,
-                iconUrl: iconUrl || null,
+            const tempId = getCookie(); // your temp cookie, if present
+            await Auth.register({
+                tempUserId: tempId || undefined,
+                username,
+                password: pass,
                 email: email || null,
-            };
-            const res = await Api.register(user.userId, body);
-            if (res.ok) setUser(res);
-            else setErr(res.msg || "Failed to register account.");
+                iconUrl: iconUrl || null,
+            });
+
+            // We’re signed in now (auth cookie set). Hydrate the UI:
+            const me = await Auth.me();
+            if (!me?.ok) throw new Error("Could not load profile after registration.");
+            setUser(me);
+
+            // Clear temp cookie if it existed (we’re on auth cookie now)
+            if (tempId) clearCookie();
+
+            // Route: if a pending join exists, the Landing/GameJoin flow will handle it;
+            // here we just go to lobby by default.
+            const pending = getPendingJoin?.();
+            if (pending) nav(`/game/${pending}`, { replace: true });
+            else nav("/lobby", { replace: true });
+
             onClose();
         } catch (e: any) {
-            setErr(e.message || "Failed to register account.");
+            setErr(e?.msg || e?.error || "Registration failed.");
         } finally {
             setBusy(false);
+            setPass(""); // don’t keep password in memory
         }
     };
 
@@ -38,19 +55,19 @@ export default function RegisterModal({ open, onClose }: { open: boolean; onClos
     return (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
             <div className="card w-full max-w-lg">
-                <div className="card-header"><h5 className="card-title m-0">Register Account</h5></div>
+                <div className="card-header"><h5 className="card-title m-0">Create Account</h5></div>
                 <div className="card-body">
                     <div className="mb-3">
                         <label className="form-label">Username</label>
-                        <input className="form-control" value={name} onChange={e => setName(e.target.value)} />
+                        <input className="form-control" value={username} onChange={e => setUsername(e.target.value)} autoComplete="username" />
                     </div>
                     <div className="mb-3">
                         <label className="form-label">Password</label>
-                        <input className="form-control" type="password" value={pass} onChange={e => setPass(e.target.value)} />
+                        <input className="form-control" type="password" value={pass} onChange={e => setPass(e.target.value)} autoComplete="new-password" />
                     </div>
                     <div className="mb-3">
                         <label className="form-label">Email (optional)</label>
-                        <input className="form-control" value={email} onChange={e => setEmail(e.target.value)} />
+                        <input className="form-control" type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" />
                     </div>
                     <div className="mb-3">
                         <label className="form-label">Icon URL (optional)</label>
@@ -60,7 +77,9 @@ export default function RegisterModal({ open, onClose }: { open: boolean; onClos
                 </div>
                 <div className="card-footer flex justify-end gap-2">
                     <button className="btn btn-secondary" onClick={onClose} disabled={busy}>Cancel</button>
-                    <button className="btn btn-primary" onClick={submit} disabled={busy}>{busy ? "Registering..." : "Register"}</button>
+                    <button className="btn btn-primary" onClick={submit} disabled={busy}>
+                        {busy ? "Creating…" : "Create Account"}
+                    </button>
                 </div>
             </div>
         </div>

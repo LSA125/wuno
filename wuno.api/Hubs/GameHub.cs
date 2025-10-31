@@ -21,11 +21,20 @@ namespace Wuno.Api.Hubs
         public async Task ConnectToGame(string gameCode, Guid userId, CancellationToken ct)
         {
             Guid gameId = await _svc.GetGameId(gameCode, ct);
-            var res = await _svc.JoinGameAsync(gameId, userId, ct);
-            _tracker.Add(Context.ConnectionId, res.PlayerId);
-            await Groups.AddToGroupAsync(Context.ConnectionId, $"game:{gameId}", ct);
-            await Clients.Caller.SendAsync("ConnectedToGame", res, ct);
-            await Clients.Group($"game:{gameId}").SendAsync("PlayersUpdated", res.State.Players, ct);
+
+            try
+            {
+                var res = await _svc.JoinGameAsync(gameId, userId, ct);
+                _tracker.Add(Context.ConnectionId, res.PlayerId);
+                await Groups.AddToGroupAsync(Context.ConnectionId, $"game:{gameId}", ct);
+                await Clients.Caller.SendAsync("ConnectedToGame", res, ct);
+                await Clients.Group($"game:{gameId}").SendAsync("PlayersUpdated", res.State.Players, ct);
+            }
+            catch (Exception ex)
+            {
+                await Clients.Caller.SendAsync("ConnectionFailed", ex.Message, ct);
+                return;
+            }
         }
         public async Task LeaveGame(Guid gameId, Guid playerId, CancellationToken ct)
         {

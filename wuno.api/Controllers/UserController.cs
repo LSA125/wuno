@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using Wuno.Application.Games;
 using Wuno.Application.Users;
 namespace Wuno.Api.Controllers
@@ -14,6 +15,16 @@ namespace Wuno.Api.Controllers
         {
             var res = await _us.GetUserAsync(id, ct);
             return res.Ok ? Ok(res) : NotFound();
+        }
+        [HttpGet("/reg/{id:guid}")]
+        public async Task<IActionResult> GetRegistered(Guid id, CancellationToken ct)
+        {
+            var res = await _us.GetUserAsync(id, ct);
+            if (!res.Ok)
+                return NotFound();
+            if (res.Email == null)
+                return BadRequest(new UserResponse(false, null, null, null, null, "User is not registered."));
+            return Ok(res);
         }
         [HttpPost("new")]
         public async Task<IActionResult> New([FromBody] TmpUserRequest req, CancellationToken ct)
@@ -38,7 +49,8 @@ namespace Wuno.Api.Controllers
         [HttpPost("edit/registered/{id:guid}")]
         public async Task<IActionResult> EditRegistered([FromBody] RegUserRequest req, CancellationToken ct)
         {
-            var res = await _us.EditRegisteredUserAsync(req.UserId, req.Pass, req.Name, req.IconUrl, req.Email, ct);
+            var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "");
+            var res = await _us.EditRegisteredUserAsync(userId, req.Pass, req.Name, req.IconUrl, req.Email, ct);
             return res.Ok ? Ok(res) : BadRequest(res);
         }
 

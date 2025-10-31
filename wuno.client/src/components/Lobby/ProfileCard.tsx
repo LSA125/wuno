@@ -3,6 +3,9 @@ import EditAnonModal from "./EditAnonModal";
 import RegisterModal from "./RegisterModal";
 import EditRegisteredModal from "./EditRegisteredModal";
 import { useState } from "react";
+import { clearCookie } from "@/auth/cookies";
+import { useToast } from "../../context/ToastContext";
+import { useNavigate } from "react-router-dom";
 
 export default function ProfileCard() {
     const { user } = useUser();
@@ -11,10 +14,24 @@ export default function ProfileCard() {
     const [showEditReg, setShowEditReg] = useState(false);
 
     const isRegistered = !!(user?.email && user?.name && user?.ok); // heuristic
-
+    const { setUser } = useUser();
+    const { push } = useToast();
+    const nav = useNavigate();
+    const handleSignOut = () => {
+        clearCookie();
+        setUser(null);
+        push("You’ve been signed out successfully.");
+        nav("/", { replace: true });
+    };
     return (
         <div className="card shadow-lg">
             <div className="card-body">
+                <button
+                    onClick={handleSignOut}
+                    className="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 m-1"
+                >
+                    Sign Out
+                </button>
                 <h5 className="card-title">Your Profile</h5>
                 {user?.iconUrl && (
                     <div className="mb-3">
