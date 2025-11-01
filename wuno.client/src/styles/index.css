@@ -2,7 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* src/styles/index.css */
 @keyframes toastIn {
     from {
         opacity: 0;
@@ -18,12 +17,10 @@
 .toast-enter {
     animation: toastIn 160ms ease-out;
 }
-
 :root {
     --lobby-bg: url("/bg/lobby.png");
 }
 
-/* Full-page image with soft vignette + blur at the top for readability */
 body {
     background-image: radial-gradient(1200px 600px at 50% -10%, rgba(255,255,255,0.9), rgba(255,255,255,0.65) 40%, rgba(255,255,255,0.35) 70%, rgba(255,255,255,0.15) 100%), var(--lobby-bg);
     background-size: cover;
@@ -31,7 +28,7 @@ body {
     background-attachment: fixed;
 }
 
-/* Optional: soften all cards slightly so they pop from background */
+
 .card {
     backdrop-filter: blur(2px);
     background-color: rgba(255,255,255,0.92);

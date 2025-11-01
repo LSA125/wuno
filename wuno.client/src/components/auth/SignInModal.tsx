@@ -1,4 +1,3 @@
-// src/components/Auth/SignInModal.tsx
 import { useState } from "react";
 import { Auth } from "@/api/client";
 

@@ -60,6 +60,9 @@ namespace Wuno.Api.Hubs
 
             if (await _svc.AreAllPlayersReadyAsync(gameId, ct))
             {
+                var timer = 3000;
+                await _hub.Clients.Group($"game:{gameId}").SendAsync("AllPlayersReady", timer, ct);
+                Task.Delay(timer, ct).Wait(ct);
                 var turn = await _svc.StartMatchAsync(gameId, ct);
                 var state = await _svc.GetGameStateAsync(gameId, ct);
                 await _hub.Clients.Group($"game:{gameId}").SendAsync("MatchStarted", state, ct);
@@ -108,7 +111,12 @@ namespace Wuno.Api.Hubs
         }
         public async Task WordChanged(string word, CancellationToken ct)
         {
-            await Clients.Caller.SendAsync("WordChanged", word, ct);
+            //check if 50ms have passed since last change
+            if (!_typingGate.tryAllow(Context.ConnectionId, TimeSpan.FromMilliseconds(100)))
+            {
+                return;
+            }
+            await Clients.OthersInGroup(Context.ConnectionId).SendAsync("WordChanged", word, ct);
         }
 
         private async Task BroadcastAfterTimeout(Guid gameId, Guid turnId)

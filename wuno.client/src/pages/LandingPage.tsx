@@ -1,4 +1,3 @@
-// src/pages/LandingPage.tsx
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCookie, setCookie } from "@/auth/cookies";
@@ -8,7 +7,7 @@ import FirstTimeModal from "@/components/lobby/FirstTimeModal";
 import RegisterModal from "@/components/lobby/RegisterModal";
 import { getPendingJoin, clearPendingJoin } from "@/utils/pendingJoin";
 import SignInModal from "@/components/auth/SignInModal";
-import { useToast } from "../context/ToastContext";
+import { useToast } from "@/context/ToastContext";
 
 export default function LandingPage() {
     const nav = useNavigate();
@@ -23,6 +22,11 @@ export default function LandingPage() {
         if (sessionStorage.getItem("auth_expired") === "1") {
             push("Your session expired. Please sign in again.");
             sessionStorage.removeItem("auth_expired");
+        }
+        if (sessionStorage.getItem("signed_out") === "1") {
+            console.log("Displaying signed out message.");
+            push("You’ve been signed out successfully.");
+            sessionStorage.removeItem("signed_out");
         }
     }, [push]);
 

@@ -53,7 +53,7 @@ namespace wuno.domain
         public string? IconUrl { get; set; } = "";
         public bool IsActive { get; set; }
         public bool IsConnected { get; set; }
-        public bool IsHost { get; set; }
+        public bool IsTaken { get; set; }
         public int Seat { get; set; }
         public int RoundWins { get; set; }
         public string? LastWord { get; set; }
@@ -85,7 +85,6 @@ namespace wuno.domain
         public int Seat { get; set; }
         public char? StartLetter { get; set; } // null = any / free-start
         public int MinLen { get; set; } = 1;
-        public bool Require2Vowels { get; set; }
         public bool FreeStart { get; set; }
         public DateTime StartedAt { get; set; }
         public int DurationSec { get; set; }

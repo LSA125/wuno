@@ -19,8 +19,8 @@ namespace Wuno.Application.Games
     public record JoinGameRequest(Guid GameId, Guid UserId);
     public record JoinGameResponse(Guid PlayerId, GameState State);
     public record LeaveGameRequest(Guid GameId, Guid PlayerId);
-    public record PlayerState(Guid PlayerId, int Seat, bool IsActive, bool IsConnected, bool IsHost, string Name, string? IconUrl, int RoundWins, string? LastWord);
-    public record TurnState(Guid TurnId,int Index, int Seat, DateTime StartedAt, int DurationSec, DateTime DueAt, int MinLen, bool FreeStart, bool Req2Vowels);
+    public record PlayerState(Guid PlayerId, int Seat, bool IsActive, bool IsConnected, string Name, string? IconUrl, int RoundWins, string? LastWord);
+    public record TurnState(Guid TurnId,int Index, int Seat, DateTime StartedAt, int DurationSec, DateTime DueAt, int MinLen, bool FreeStart);
     public record RoundState(Guid RoundId, int Index, bool Active, Guid? WinnerId, DateTime? StartedAt, DateTime? EndedAt);
     public record GameState(Guid GameId, GameStatus Status, int NextSeat, int Direction, int TargetWins, List<PlayerState> Players, RoundState CurrentRound, TurnState CurrentTurn);
 }
