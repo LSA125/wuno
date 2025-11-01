@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -70,6 +71,10 @@ builder.Services.AddSignalR();
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Services.AddCors();
+builder.Services.AddDataProtection()
+  .PersistKeysToFileSystem(new DirectoryInfo(
+      Path.Combine(builder.Environment.ContentRootPath, "keys")))
+  .SetApplicationName("WunoApp");
 
 var app = builder.Build();
 
@@ -100,11 +105,12 @@ app.Use(async (ctx, next) =>
 app.UseHttpsRedirection();
 app.UseCors(p => p.WithOrigins("https://localhost:5173", "http://localhost:3000", "https://localhost:7031", "http://localhost:5139")
                   .AllowAnyHeader().AllowAnyMethod());
-app.MapHub<GameHub>("hubs/game");
+app.MapHub<GameHub>("/hubs/game");
 app.UseRateLimiter();
 
-app.UseAuthorization();
 app.UseAuthentication();
+app.UseAuthorization();
+
 
 app.MapControllers();
 

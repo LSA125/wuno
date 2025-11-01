@@ -4,24 +4,24 @@ import RegisterModal from "./RegisterModal";
 import EditRegisteredModal from "./EditRegisteredModal";
 import { useState } from "react";
 import { clearCookie } from "@/auth/cookies";
-import { useToast } from "../../context/ToastContext";
+import { useToast } from "@/context/ToastContext";
 import { useNavigate } from "react-router-dom";
 
 export default function ProfileCard() {
-    const { user } = useUser();
+    const { user, setUser } = useUser();
     const [showEditAnon, setShowEditAnon] = useState(false);
     const [showRegister, setShowRegister] = useState(false);
     const [showEditReg, setShowEditReg] = useState(false);
 
     const isRegistered = !!(user?.email && user?.name && user?.ok); // heuristic
-    const { setUser } = useUser();
     const { push } = useToast();
     const nav = useNavigate();
     const handleSignOut = () => {
+        console.log("Signing out user:", user);
         clearCookie();
         setUser(null);
-        push("You’ve been signed out successfully.");
-        nav("/", { replace: true });
+        sessionStorage.setItem("signed_out", "1");
+        nav("/", { replace: true })
     };
     return (
         <div className="card shadow-lg">

@@ -1,11 +1,59 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace wuno.domain.Rules
 {
+    public sealed class EffectRng
+    {
+        private byte[] _buffer;
+        private int _offset;
+
+        public static EffectRng FromInputs(
+            Guid gameId,
+            int roundIndex,
+            int turnNumber,
+            string word,
+            string? opponentsLast)
+        {
+            using var sha = SHA256.Create();
+            var seedMaterial = $"{gameId:N}|{roundIndex}|{turnNumber}|{word}|{opponentsLast}";
+            var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(seedMaterial));
+            return new EffectRng(bytes);
+        }
+
+        private EffectRng(byte[] seed)
+        {
+            _buffer = seed;
+            _offset = 0;
+        }
+        private uint NextUInt32()
+        {
+            if (_offset + 4 > _buffer.Length)
+            {
+                using var sha = SHA256.Create();
+                var more = sha.ComputeHash(_buffer);
+                Array.Resize(ref _buffer, _buffer.Length + more.Length);
+                Buffer.BlockCopy(more, 0, _buffer, _offset, more.Length);
+            }
+
+            uint val = BitConverter.ToUInt32(_buffer, _offset);
+            _offset += 4;
+            // simple xorshift to decorrelate consecutive pulls
+            val ^= val << 13; val ^= val >> 17; val ^= val << 5;
+            return val;
+        }
+
+        public int Next(int maxExclusive)
+        {
+            if (maxExclusive <= 0) return 0;
+
+            // Rejection sampling to avoid modulo bias
+            uint limit = (uint.MaxValue / (uint)maxExclusive) * (uint)maxExclusive;
+            uint r;
+            do { r = NextUInt32(); } while (r >= limit);
+            return (int)(r % (uint)maxExclusive);
+        }
+    }
     public record Constraints(char? StartLetter, int MinLen, int DurationSec, bool Require2Vowels, bool FreeStart)
     {
         public static Constraints Base(char? start, int turnNumber, string? lastWord) => 
@@ -19,21 +67,29 @@ namespace wuno.domain.Rules
 
     public static class EffectsLogic
     {
-        public static IEnumerable<(EffectType type, int value, EffectTarget target)> SpecialsFromWord(string word, string? opponentsLast)
+        public static IEnumerable<(EffectType type, int value, EffectTarget target)> SpecialsFromWord
+            (string word, 
+            string? opponentsLast, 
+            EffectRng rng)
         {
-            if (Words.IsPalindrome(word))
+            int revMatchLength = Math.Max(0, Words.ReverseMatchLength(word, opponentsLast ?? "") - 1);
+
+            for (int rev = revMatchLength; rev >= 1; rev--)
             {
-                yield return (EffectType.ADD_TIME, +Constants.MID_TIME_ADJ_SEC, EffectTarget.SELF);
-                yield return (EffectType.ADD_TIME, -Constants.MID_TIME_ADJ_SEC, EffectTarget.NEXT);
-            }
-            if (Words.HasLetter3Plus(word))
-            {
-                yield return (EffectType.ADJ_MIN_LEN, -Constants.LOW_LEN_ADJ, EffectTarget.SELF);
-                yield return (EffectType.ADJ_MIN_LEN, +Constants.LOW_LEN_ADJ, EffectTarget.NEXT);
-            }
-            if (!string.IsNullOrEmpty(opponentsLast) && Words.IsAnagram(word, opponentsLast!))
-            {
-                yield return (EffectType.FREE_START, 1, EffectTarget.SELF);
+                // pick target: 0=self, 1=opponent
+                bool toSelf = rng.Next(2) == 0;
+
+                // pick effect bucket: time or min-len, with sign depending on target
+                bool timeEffect = rng.Next(2) == 0;
+
+                if (toSelf && timeEffect)
+                    yield return (EffectType.ADD_TIME, /*value*/ Constants.LOW_TIME_ADJ_SEC, EffectTarget.SELF);
+                else if (toSelf && !timeEffect)
+                    yield return (EffectType.ADJ_MIN_LEN, /*value*/ -Constants.LOW_LEN_ADJ, EffectTarget.SELF);
+                else if (!toSelf && timeEffect)
+                    yield return (EffectType.ADD_TIME, /*value*/ -Constants.LOW_TIME_ADJ_SEC, EffectTarget.NEXT);
+                else
+                    yield return (EffectType.ADJ_MIN_LEN, /*value*/ +Constants.LOW_LEN_ADJ, EffectTarget.NEXT);
             }
         }
 
@@ -50,8 +106,6 @@ namespace wuno.domain.Rules
                         c = c with { MinLen = Math.Max(1, c.MinLen + val) }; break;
                     case EffectType.FREE_START:
                         if (val != 0) c = c with { FreeStart = true, StartLetter = null }; break;
-                    case EffectType.REQ_2_VOWELS:
-                        c = c with { Require2Vowels = val != 0 }; break;
                 }
             }
             return c;
