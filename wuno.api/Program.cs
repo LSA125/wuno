@@ -24,6 +24,7 @@ builder.Services.AddScoped<IGameService, GameService>();
 builder.Services.AddScoped<IUserService, NoEmailUserService>();
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.AddSingleton<IEmailSender, EmailSender>();
+builder.Services.AddSingleton<ICodeGeneratorService, CodeGeneratorService>();
 builder.Services.AddSingleton<ITypingGate, TypingGate>();
 builder.Services.AddSingleton<ITurnTimer, TurnTimer>();
 builder.Services.AddSingleton<IGroupTracker, GroupTracker>();

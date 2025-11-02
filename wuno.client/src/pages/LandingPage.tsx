@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCookie, setCookie } from "@/auth/cookies";
 import { Api, Auth } from "@/api/client";
-import { useUser } from "@/context/UserContext";
+import { normalizeUser, useUser } from "@/context/UserContext";
 import FirstTimeModal from "@/components/lobby/FirstTimeModal";
 import RegisterModal from "@/components/lobby/RegisterModal";
-import { getPendingJoin, clearPendingJoin } from "@/utils/pendingJoin";
+import { getPendingJoin } from "@/utils/pendingJoin";
 import SignInModal from "@/components/auth/SignInModal";
 import { useToast } from "@/context/ToastContext";
+import type { UserResponse } from "@/api/types";
+import { tryAutoRejoin } from "@/utils/autoRejoin";
 
 export default function LandingPage() {
     const nav = useNavigate();
@@ -15,6 +17,7 @@ export default function LandingPage() {
     const [showSignIn, setShowSignIn] = useState(false);
     const [showGuest, setShowGuest] = useState(false);
     const [showRegister, setShowRegister] = useState(false);
+    const [loading, setLoading] = useState(true);
     const ran = useRef(false);
 
     const { push } = useToast();
@@ -24,7 +27,6 @@ export default function LandingPage() {
             sessionStorage.removeItem("auth_expired");
         }
         if (sessionStorage.getItem("signed_out") === "1") {
-            console.log("Displaying signed out message.");
             push("You’ve been signed out successfully.");
             sessionStorage.removeItem("signed_out");
         }
@@ -35,40 +37,62 @@ export default function LandingPage() {
         ran.current = true;
 
         (async () => {
-            const uid = getCookie();
-            if (!uid) return;
+            // 1) Registered session
             try {
-                const u = await Api.getUser(uid);
-                if (u?.ok) {
+                const me: UserResponse = await Auth.meSafe();
+                if (me?.ok) {
+                    const u = normalizeUser(me, true);
                     setUser(u);
-                    const pending = getPendingJoin();
-                    if (pending) nav(`/game/${pending}`, { replace: true });
-                    else nav("/lobby", { replace: true });
-                }
-            } catch { /* stay */ }
-        })();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
 
-    const afterAuth = (id: string, u: any) => {
+                    const auto = await tryAutoRejoin(u);
+                    const pending = getPendingJoin();
+                    nav((pending || auto) ? `/game/${pending || auto}` : "/lobby", { replace: true });
+                    return;
+                }
+            } catch { }
+
+            // 2) Guest cookie
+            const uid = getCookie();
+            if (uid) {
+                try {
+                    const res: UserResponse = await Api.getUser(uid);
+                    if (res?.ok) {
+                        const u = normalizeUser(res, false);
+                        setUser(u);
+
+                        const auto = await tryAutoRejoin(u);
+                        const pending = getPendingJoin();
+                        nav((pending || auto) ? `/game/${pending || auto}` : "/lobby", { replace: true });
+                        return;
+                    }
+                } catch { }
+            }
+
+            setLoading(false);
+        })();
+    }, [nav, setUser]);
+
+    const afterAuth = async (id: string, ures: UserResponse) => {
         setCookie(id);
+        const u = normalizeUser(ures, false);
         setUser(u);
+        const auto = await tryAutoRejoin(u);
         const pending = getPendingJoin();
-        if (pending) {
-            nav(`/game/${pending}`, { replace: true });
-        } else {
-            nav("/lobby", { replace: true });
-        }
+        nav((pending || auto) ? `/game/${pending || auto}` : "/lobby", { replace: true });
     };
+
     const onSignedIn = async () => {
-        const me = await Auth.me();   // user from auth cookie
+        const me: UserResponse = await Auth.me();
         if (me?.ok) {
-            setUser(me);
+            const u = normalizeUser(me, true);
+            setUser(u);
+            const auto = await tryAutoRejoin(u);
             const pending = getPendingJoin();
-            if (pending) nav(`/game/${pending}`, { replace: true });
-            else nav("/lobby", { replace: true });
+            nav((pending || auto) ? `/game/${pending || auto}` : "/lobby", { replace: true });
         }
     };
+
+    if (loading) return null;
 
     return (
         <div className="container mx-auto px-4 min-h-[calc(100vh-64px)] flex items-center justify-center">
@@ -100,25 +124,10 @@ export default function LandingPage() {
             </div>
 
             {showGuest && (
-                <FirstTimeModal
-                    open
-                    onClose={() => setShowGuest(false)}
-                    onSuccess={(id, u) => afterAuth(id, u)}
-                />
+                <FirstTimeModal open onClose={() => setShowGuest(false)} onSuccess={(id, u) => afterAuth(id, u)} />
             )}
-            {showRegister && (
-                <RegisterModal
-                    open
-                    onClose={() => setShowRegister(false)}
-                />
-            )}
-            {showSignIn && (
-                <SignInModal
-                    open
-                    onClose={() => setShowSignIn(false)}
-                    onSuccess={onSignedIn}
-                />
-            )}
+            {showRegister && <RegisterModal open onClose={() => setShowRegister(false)} />}
+            {showSignIn && <SignInModal open onClose={() => setShowSignIn(false)} onSuccess={onSignedIn} />}
         </div>
     );
 }

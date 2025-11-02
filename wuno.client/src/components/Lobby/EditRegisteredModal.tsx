@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Api } from "@/api/client";
-import { useUser } from "@/context/UserContext";
-import type { RegUserRequest } from "@/api/types";
+import { normalizeUser, useUser } from "@/context/UserContext";
+import type { RegUserRequest, UserResponse } from "@/api/types";
 
 export default function EditRegisteredModal({ open, onClose }: { open: boolean; onClose: () => void; }) {
     const { user, setUser } = useUser();
@@ -23,8 +23,8 @@ export default function EditRegisteredModal({ open, onClose }: { open: boolean; 
                 iconUrl: iconUrl || null,
                 email: email || null,
             };
-            const res = await Api.editRegistered(user.userId, body);
-            if (res.ok) setUser(res);
+            const res: UserResponse = await Api.editRegistered(user.userId, body);
+            if (res.ok) setUser(normalizeUser(res, true));
             else setErr(res.msg || "Failed to update account.");
             onClose();
         } catch (e: any) {

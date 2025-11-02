@@ -1,0 +1,3 @@
+Fix spoof vulnerability.
+
+add leave game function.

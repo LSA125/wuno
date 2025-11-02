@@ -24,6 +24,7 @@ namespace Wuno.Application.Games
         Task<RoundState> GetRoundAsync(Guid roundId, CancellationToken ct);
         Task<TurnState> GetTurnAsync(Guid turnId, CancellationToken ct);
         Task<GameState> GetGameStateAsync(Guid gameId, CancellationToken ct); // compact state for UI
+        Task<GameCodeResponse> GetUserActiveGameCodeAsync(Guid userId, CancellationToken ct);
         Task<SubmitWordResponse> SubmitWordAsync(Guid gameId, Guid roundId, Guid turnId, SubmitWordRequest req, CancellationToken ct);
         TurnState StartTurn(Game game, Round round, char? prevAcceptedLetter, CancellationToken ct);
         Task<JoinGameResponse> JoinGameAsync(Guid gameId, Guid userId, CancellationToken ct);

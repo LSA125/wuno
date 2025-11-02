@@ -6,6 +6,7 @@ import { useState } from "react";
 import { clearCookie } from "@/auth/cookies";
 import { useToast } from "@/context/ToastContext";
 import { useNavigate } from "react-router-dom";
+import { Auth } from "@/api/client";
 
 export default function ProfileCard() {
     const { user, setUser } = useUser();
@@ -13,15 +14,26 @@ export default function ProfileCard() {
     const [showRegister, setShowRegister] = useState(false);
     const [showEditReg, setShowEditReg] = useState(false);
 
-    const isRegistered = !!(user?.email && user?.name && user?.ok); // heuristic
     const { push } = useToast();
     const nav = useNavigate();
-    const handleSignOut = () => {
-        console.log("Signing out user:", user);
-        clearCookie();
-        setUser(null);
-        sessionStorage.setItem("signed_out", "1");
-        nav("/", { replace: true })
+    const handleSignOut = async () => {
+        try {
+            if (user?.registered) {
+                // ensure this request survives navigation
+                await Auth.logout();
+            }
+        } catch (e) {
+            push("Error signing out");
+        } finally {
+            // local cleanup always
+            setUser(null);
+            clearCookie();                           // clears *guest* cookie only
+            sessionStorage.setItem("signed_out", "1");
+
+            // if you have a SignalR connection, stop it here to avoid auto-rejoins
+
+            nav("/", { replace: true })
+        }
     };
     return (
         <div className="card shadow-lg">
@@ -47,7 +59,7 @@ export default function ProfileCard() {
                     <dd>{user?.email || "—"}</dd>
                 </dl>
 
-                {!isRegistered ? (
+                {!user?.registered ? (
                     <div className="flex flex-col gap-2">
                         <button className="btn btn-outline-primary" onClick={() => setShowEditAnon(true)}>
                             Edit Temporary Account

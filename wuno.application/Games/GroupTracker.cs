@@ -9,39 +9,31 @@ namespace Wuno.Application.Games
 {
     public sealed class GroupTracker : IGroupTracker
     {
-        private readonly ConcurrentDictionary<string, HashSet<Guid>> _map = new();
-        public void Add(string connectionId, Guid group)
+        private readonly ConcurrentDictionary<string, PlayerSession> _map = new();
+        public void Add(string connectionId, PlayerSession ps)
         {
-            var groups = _map.GetOrAdd(connectionId, _ => new HashSet<Guid>());
-            lock (groups)
+            _map[connectionId] = ps;
+        }
+        public void Remove(string connectionId)
+        {
+            if(_map.TryGetValue(connectionId, out var ps))
             {
-                groups.Add(group);
+                _map.TryRemove(connectionId, out _);
             }
         }
-        public void Remove(string connectionId, Guid group)
+        public bool TryGet(string connectionId, out PlayerSession session)
         {
-            if (_map.TryGetValue(connectionId, out var groups))
+            if(_map.TryGetValue(connectionId, out var ps))
             {
-                lock (groups)
-                {
-                    groups.Remove(group);
-                    if (groups.Count == 0)
-                    {
-                        _map.TryRemove(connectionId, out _);
-                    }
-                }
+                session = ps;
+                return true;
             }
+            session = default!;
+            return false;
         }
-        public IReadOnlyCollection<Guid> GetGroups(string connectionId)
+        public IEnumerable<PlayerSession> GetConnectionsForGame(Guid gameId)
         {
-            if (_map.TryGetValue(connectionId, out var groups))
-            {
-                lock (groups)
-                {
-                    return groups.ToList().AsReadOnly();
-                }
-            }
-            return [];
+            return _map.Values.Where(ps => ps.GameId == gameId);
         }
         public void Clear(string connectionId)
         {

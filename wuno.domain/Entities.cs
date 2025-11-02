@@ -47,6 +47,7 @@ namespace wuno.domain
     {
         public Guid Id { get; init; } = Guid.NewGuid();
         public Guid GameId { get; set; }
+        public Game Game { get; set; } = null!;
         public Guid? UserId { get; set; }
         public User? User { get; set; }
         public string Name { get; set; } = "";

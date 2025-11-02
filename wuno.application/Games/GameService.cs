@@ -15,7 +15,11 @@ namespace Wuno.Application.Games
     {
         private readonly AppDbContext _db;
         private readonly IWordList _wl;
-        public GameService(AppDbContext db, IWordList wl) { _db = db; _wl = wl; }
+        private readonly ICodeGeneratorService _cg;
+        public GameService(AppDbContext db, IWordList wl, ICodeGeneratorService cg)
+        {
+            _db = db; _wl = wl; _cg = cg;
+        }
 
         public async Task<Guid> GetGameId(string code, CancellationToken ct)
         {
@@ -43,7 +47,7 @@ namespace Wuno.Application.Games
               .Include(g => g.Players)
               .FirstOrDefaultAsync(g => g.Id == gameId, ct);
             if (game is null) throw new Exception("Game not found");
-            return game.Players.Where(p => p.IsConnected).All(p => p.IsActive);
+            return game.Players.All(p => p.IsActive) && game.Players.Count(p => p.IsActive) >= 2;
         }
         public async Task<NewGameResponse> StartNewGameAsync(NewGameRequest req, CancellationToken ct)
         {
@@ -52,14 +56,25 @@ namespace Wuno.Application.Games
             {
                 TargetWins = Math.Clamp(req.TargetWins, Constants.MIN_TARGET_WINS, Constants.MAX_TARGET_WINS),
                 NextSeat = 1,
-                Status = GameStatus.WAITING
+                Status = GameStatus.WAITING,
             };
+            // try generate unique code
+            string code;
+            int attempts = 0;
+            do
+            {
+                code = _cg.GenerateCode();
+                attempts++;
+            } while (await _db.Games.AnyAsync(g => g.Code == code, ct) && attempts < 100);
+            if (attempts >= 100) throw new Exception("Failed to generate unique game code");
+            game.Code = code;
+
             for (int i = 1; i <= n; i++) game.Players.Add(new Player { Seat = i, GameId = game.Id });
 
             _db.Games.Add(game);
             await _db.SaveChangesAsync(ct);
 
-            return new NewGameResponse(game.Id, 1, n, game.TargetWins);
+            return new NewGameResponse(game.Code, 1, n, game.TargetWins);
         }
         public async Task<TurnState> StartMatchAsync(Guid gameId, CancellationToken ct)
         {
@@ -173,19 +188,47 @@ namespace Wuno.Application.Games
         }
         public async Task<GameState> GetGameStateAsync(Guid gameId, CancellationToken ct)
         {
-            return await _db.Games.Where(g => g.Id == gameId)
+            return await _db.Games
+              .AsNoTracking()
+              .Where(g => g.Id == gameId)
               .Select(g => new GameState(
                   g.Id,
                   g.Status,
                   g.NextSeat,
                   g.Direction,
                   g.TargetWins,
-                  g.Players.OrderBy(p => p.Seat).Select(p => new PlayerState(p.Id, p.Seat, p.IsActive, p.IsConnected, p.Name, p.IconUrl, p.RoundWins, p.LastWord)).ToList(),
-                  g.Rounds.OrderByDescending(r => r.Index).Select(r => new RoundState(r.Id, r.Index, r.Active, r.WinnerId, r.StartedAt, r.EndedAt)).FirstOrDefault()!,
-                  g.Turns.Where(t => t.EndedAt == null).OrderByDescending(t => t.Index).Select(t => new TurnState(t.Id, t.Index, t.Seat, t.StartedAt, t.DurationSec, t.DueAt, t.MinLen, t.FreeStart)).FirstOrDefault()!
+                  g.Players
+                    .Where(p => p.IsTaken)
+                    .OrderBy(p => p.Seat)
+                    .Select(p => new PlayerState(p.Id, p.Seat, p.IsActive, p.IsConnected, p.Name, p.IconUrl, p.RoundWins, p.LastWord))
+                    .ToList(),
+                  g.Rounds
+                    .OrderByDescending(r => r.Index)
+                    .Select(r => new RoundState(r.Id, r.Index, r.Active, r.WinnerId, r.StartedAt, r.EndedAt))
+                    .FirstOrDefault()!,
+                  g.Turns
+                    .Where(t => t.EndedAt == null)
+                    .OrderByDescending(t => t.Index)
+                    .Select(t => new TurnState(t.Id, t.Index, t.Seat, t.StartedAt, t.DurationSec, t.DueAt, t.MinLen, t.FreeStart))
+                    .FirstOrDefault()!
               ))
-              .AsNoTracking()
               .FirstOrDefaultAsync(ct) ?? throw new Exception("Game not found");
+        }
+        public async Task<GameCodeResponse> GetUserActiveGameCodeAsync(Guid userId, CancellationToken ct)
+        {
+            string? activeGameCode = await _db.Users.
+                Where(u => u.Id == userId).
+                Select(u => u.ActivePlayer).
+                Where(p => p != null).
+                Select(p => p!.Game).
+                Where(g => g.Status == GameStatus.ACTIVE || g.Status == GameStatus.WAITING).
+                Select(g => g.Code).
+                FirstOrDefaultAsync(ct);
+            if (activeGameCode is null)
+            {
+                return new GameCodeResponse(true, false, null);
+            }
+            return new GameCodeResponse(true, true, activeGameCode);
         }
 
         public async Task<SubmitWordResponse> SubmitWordAsync(Guid gameId, Guid roundId, Guid turnId, SubmitWordRequest req, CancellationToken ct)
@@ -355,6 +398,7 @@ namespace Wuno.Application.Games
             inactive.IsTaken = true;
             inactive.Name = user.Name;
             inactive.IconUrl = user.IconUrl;
+            user.ActivePlayer = inactive;
             await _db.SaveChangesAsync(ct);
             GameState? state = await GetGameStateAsync(gameId, ct) as GameState;
             if (state is null) throw new Exception("Failed to get game state after joining");
@@ -369,11 +413,15 @@ namespace Wuno.Application.Games
             await _db.SaveChangesAsync(ct);
             return (player.GameId, await GetPlayersAsync(player.GameId, ct));
         }
-        async public Task LeaveGameAsync(Guid gameId, Guid playerId, CancellationToken ct)
+        async public Task LeaveGameAsync(Guid userId, CancellationToken ct)
         {
-            Player player = _db.Find<Player>(playerId) ?? throw new Exception("Player not found when leaving game");
-            Game game = _db.Find<Game>(gameId) ?? throw new Exception("Game not found when leaving game");
-            game.Players.Remove(player);
+            var user = await _db.Users
+                .Include(u => u.ActivePlayer)
+                .FirstOrDefaultAsync(u => u.Id == userId, ct);
+            if (user is null) throw new Exception("User not found when leaving game");
+            user.ActivePlayer!.IsConnected = false;
+            user.ActivePlayer.IsTaken = false;
+            user.ActivePlayer = null;
 
             await _db.SaveChangesAsync(ct);
         }

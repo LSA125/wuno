@@ -2,7 +2,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import App from "./App";
 import LandingPage from "./pages/LandingPage";
 import LobbyPage from "./pages/LobbyPage";
-import GameJoinPage from "./pages/GameJoinPage";
+import GamePage from "./pages/GamePage";
 
 const router = createBrowserRouter([
     {
@@ -16,7 +16,7 @@ const router = createBrowserRouter([
             { path: "lobby", element: <LobbyPage /> },
 
             // Future pages
-            { path: "game/:id", element: <GameJoinPage /> },
+            { path: "game/:code", element: <GamePage /> },
             // { path: "stat/:user", element: <UserStatsPage /> },
 
             // Catch-all for unknown URLs

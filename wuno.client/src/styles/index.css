@@ -17,6 +17,25 @@
 .toast-enter {
     animation: toastIn 160ms ease-out;
 }
+
+.pulse-border {
+    animation: pulseBorder 1.4s ease-in-out infinite;
+}
+
+@keyframes pulseBorder {
+    0% {
+        box-shadow: 0 0 0 0 rgba(13,110,253,.35);
+    }
+
+    70% {
+        box-shadow: 0 0 0 8px rgba(13,110,253,0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(13,110,253,0);
+    }
+}
+
 :root {
     --lobby-bg: url("/bg/lobby.png");
 }

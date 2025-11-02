@@ -2,9 +2,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Auth } from "@/api/client";
-import { useUser } from "@/context/UserContext";
+import { normalizeUser, useUser } from "@/context/UserContext";
 import { getCookie, clearCookie } from "@/auth/cookies";
 import { getPendingJoin } from "@/utils/pendingJoin";
+import { UserResponse } from "@/api/types";
 
 export default function RegisterModal({ open, onClose }: { open: boolean; onClose: () => void; }) {
     const { setUser } = useUser();
@@ -29,9 +30,9 @@ export default function RegisterModal({ open, onClose }: { open: boolean; onClos
             });
 
             // We’re signed in now (auth cookie set). Hydrate the UI:
-            const me = await Auth.me();
+            const me: UserResponse = await Auth.me();
             if (!me?.ok) throw new Error("Could not load profile after registration.");
-            setUser(me);
+            setUser(normalizeUser(me, true));
 
             // Clear temp cookie if it existed (we’re on auth cookie now)
             if (tempId) clearCookie();
