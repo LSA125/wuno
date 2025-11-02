@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using wuno.domain;
 using wuno.infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Wuno.Application.Games;
 
 [ApiController]
 [Route("api/auth")]
@@ -66,14 +67,13 @@ public sealed class AuthController : ControllerBase
         var u = await _db.Users.FindAsync([userId], ct);
         if (u is null) return Unauthorized();
 
-        return Ok(new
-        {
-            ok = true,
-            userId = u.Id,
-            name = u.Name,
-            iconUrl = u.IconUrl,
-            email = u.Email
-        });
+        return Ok(new UserResponse(
+            Ok: true,
+            UserId: u.Id,
+            Name: u.Name,
+            IconUrl: u.IconUrl,
+            Email: u.Email,
+            Msg: null));
     }
 
     public record RegisterRequest(Guid? TempUserId, string Username, string Password, string? Email, string? IconUrl);
@@ -132,13 +132,12 @@ public sealed class AuthController : ControllerBase
         var id = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(id));
 
-        return Ok(new
-        {
-            ok = true,
-            userId = user.Id,
-            name = user.Name,
-            iconUrl = user.IconUrl,
-            email = user.Email
-        });
+        return Ok(new UserResponse(
+            Ok: true,
+            UserId: user.Id,
+            Name: user.Name,
+            IconUrl: user.IconUrl,
+            Email: user.Email,
+            Msg: null));
     }
 }

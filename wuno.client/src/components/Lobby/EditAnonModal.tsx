@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Api } from "@/api/client";
-import { useUser } from "@/context/UserContext";
-import type { TmpUserRequest } from "@/api/types";
+import { normalizeUser, useUser } from "@/context/UserContext";
+import type { TmpUserRequest, UserResponse } from "@/api/types";
 
 export default function EditAnonModal({ open, onClose }: { open: boolean; onClose: () => void; }) {
     const { user, setUser } = useUser();
@@ -21,8 +21,8 @@ export default function EditAnonModal({ open, onClose }: { open: boolean; onClos
                 email: email || null,
                 iconUrl: iconUrl || null,
             };
-            const res = await Api.editAnon(user.userId, body);
-            if (res.ok) setUser(res);
+            const res: UserResponse = await Api.editAnon(user.userId, body);
+            if (res.ok) setUser(normalizeUser(res, false));
             else setErr(res.msg || "Failed to edit temporary account.");
             onClose();
         } catch (e: any) {

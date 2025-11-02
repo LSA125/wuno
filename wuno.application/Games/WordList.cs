@@ -16,12 +16,13 @@ namespace Wuno.Application.Games
         public WordList()
         {
             var asm = Assembly.GetExecutingAssembly();
-            using var stream = asm.GetManifestResourceStream("Games.words.txt")
-                ?? throw new InvalidOperationException("Word list not found in resources.");
+            using var stream = typeof(WordList).Assembly.GetManifestResourceStream(
+                                   typeof(WordList), "words.txt")
+                ?? throw new InvalidOperationException("Embedded words.txt not found.");
             using var reader = new StreamReader(stream);
 
-            _words = File.ReadLines("words.txt")
-                .Where(l => !string.IsNullOrEmpty(l))
+            _words = reader.ReadToEnd()
+                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
                 .Select(Words.Normalize)
                 .ToFrozenSet(StringComparer.OrdinalIgnoreCase);
         }

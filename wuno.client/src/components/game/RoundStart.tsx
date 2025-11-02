@@ -1,0 +1,52 @@
+import type { PlayerState } from "@/api/types";
+
+export default function RoundStart({
+    players,
+    targetWins,
+    msRemaining,
+}: {
+    players: PlayerState[];
+    targetWins: number;
+    msRemaining: number;
+}) {
+    const top = [...players].sort((a, b) => b.roundWins - a.roundWins).slice(0, 3);
+
+    return (
+        <section className="grid md:grid-cols-2 gap-4 items-stretch">
+            <div className="card shadow">
+                <div className="card-header">
+                    <h5 className="card-title mb-0">Leaderboard</h5>
+                </div>
+                <div className="card-body">
+                    <div className="grid grid-cols-3 gap-3 items-end text-center">
+                        {Array.from({ length: 3 }).map((_, i) => {
+                            const p = top[i];
+                            const podiumH = [24, 32, 20][i]; // mid tallest
+                            return (
+                                <div key={i} className="flex flex-col items-center">
+                                    <div className="text-sm mb-2">{p?.name ?? "—"}</div>
+                                    <div className="w-full bg-base-200 border rounded-t-xl flex items-end justify-center"
+                                        style={{ height: `${podiumH}vh` }}>
+                                        <div className="mb-2 text-2xl font-bold">{p ? p.roundWins : ""}</div>
+                                    </div>
+                                    <div className="text-xs mt-1 opacity-70">{p ? `Seat ${p.seat}` : ""}</div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <div className="mt-4 text-center text-sm opacity-70">First to {targetWins} wins</div>
+                </div>
+            </div>
+
+            <div className="card shadow flex items-center justify-center">
+                <div className="card-body flex items-center justify-center">
+                    <div className="text-center">
+                        <div className="text-2xl font-bold mb-2">Next round starts in</div>
+                        <div className="text-6xl font-black tracking-tight">{(msRemaining / 1000).toFixed(1)}s</div>
+                        <div className="mt-3 text-muted">Get ready!</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    );
+}

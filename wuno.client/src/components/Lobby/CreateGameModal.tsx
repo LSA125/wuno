@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Api } from "@/api/client";
 import type { NewGameRequest } from "@/api/types";
 import { useNavigate } from "react-router-dom";
-
+import { clearPendingJoin } from "@/utils/pendingJoin";
 export default function CreateGameModal({
     open,
     onClose,
@@ -24,8 +24,9 @@ export default function CreateGameModal({
         try {
             const req: NewGameRequest = { playerCount, targetWins };
             const res = await Api.createGame(req);
-            // ready for future /game route; for now we keep you in lobby:
-            // nav(`/game/${res.gameId}`);
+            clearPendingJoin();
+            console.log("Created game:", res);
+            nav(`/game/${res.gameCode}`);
             onClose();
         } catch (e: any) {
             setErr(e.message || "Failed to create game.");

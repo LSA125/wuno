@@ -12,8 +12,9 @@ namespace Wuno.Application.Games
     public record RegUserRequest(Guid UserId, string Pass, string? Name, string? IconUrl, string? Email);
     public record UserResponse(bool Ok, Guid? UserId, string? Name, string? IconUrl, string? Email, string? Msg);
     public record NewGameRequest(int PlayerCount, int TargetWins);
-    public record NewGameResponse(Guid GameId,int NextSeat, int PlayerCount, int TargetWins);
-    public record ErrorResponse(string code, string Reason);
+    public record NewGameResponse(string GameCode,int NextSeat, int PlayerCount, int TargetWins);
+    public record GameCodeResponse(bool Ok, bool? InGame, string? GameCode);
+    public record ErrorResponse(string Code, string Reason);
     public record SubmitWordRequest(int Seat, string Word);
     public record SubmitWordResponse(bool Ok, string? Reason);
     public record JoinGameRequest(Guid GameId, Guid UserId);

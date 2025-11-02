@@ -1,10 +1,14 @@
 // Lightweight JSON client + typed helpers for your endpoints
-import { RegUserRequest, TmpUserRequest, UserResponse, NewGameRequest, NewGameResponse } from "./types";
+import { RegUserRequest, TmpUserRequest, UserResponse, NewGameRequest, NewGameResponse, GameCodeResponse } from "./types";
 
 
-export async function request<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
+export async function request<T>(
+    input: RequestInfo,
+    init?: RequestInit,
+    opts?: { ignore401?: boolean }     // <-- add this
+): Promise<T> {
     const res = await fetch(input, {
-        credentials: "include", // <-- send/receive auth cookie
+        credentials: "include",
         headers: {
             "Content-Type": "application/json",
             "X-Requested-With": "XMLHttpRequest",
@@ -13,18 +17,16 @@ export async function request<T>(input: RequestInfo, init?: RequestInit): Promis
         ...init,
     });
 
-    // Handle auth expiry once, globally
     if (res.status === 401) {
-        try {
-            // mark a flag so the landing page can show "Session expired" toast
-            sessionStorage.setItem("auth_expired", "1");
-        } catch { }
-        // hard redirect to kill any in-flight React state that may be causing loops
+        if (opts?.ignore401) {
+            // return a typed empty object or throw for caller to handle
+            return {} as T;
+        }
+        try { sessionStorage.setItem("auth_expired", "1"); } catch { }
         window.location.replace("/");
         throw new Error("Session expired. Redirecting to sign in.");
     }
 
-    // Some endpoints may return no content
     const text = await res.text();
     let json: any = {};
     try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
@@ -35,7 +37,6 @@ export async function request<T>(input: RequestInfo, init?: RequestInit): Promis
     }
     return json as T;
 }
-
 export const Api = {
     // Users
     getUser: (id: string) => request<UserResponse>(`/api/users/${id}`, { method: "GET" }),
@@ -48,15 +49,28 @@ export const Api = {
     // Games
     createGame: (req: NewGameRequest) => request<NewGameResponse>(`/api/games/new`, { method: "POST", body: JSON.stringify(req) }),
     getGameState: (id: string) => request(`/api/games/id/${id}`, { method: "POST" }), // matches GamesController.Get
+    meActiveGame: () =>
+        request<GameCodeResponse>(
+            `/api/games/me/active-game`,
+            { method: "GET" },
+            { ignore401: true }
+        ),
+    guestActiveGame: (userId: string) =>
+        request<GameCodeResponse>(
+            `/api/games/users/${userId}/active-game`,
+            { method: "GET" }
+        ),
+
 };
 
 export const Auth = {
     login: (body: { username: string; password: string }) =>
         request(`/api/auth/login`, { method: "POST", body: JSON.stringify(body) }),
     logout: () => request(`/api/auth/logout`, { method: "POST" }),
-    me: () => request(`/api/auth/me`, { method: "GET" }),
+    me: () => request<UserResponse>(`/api/auth/me`, { method: "GET" }),
+    meSafe: () => request<UserResponse>(`/api/auth/me`, { method: "GET" }, { ignore401: true }),
     register: (body: { tempUserId?: string; username: string; password: string; email?: string | null; iconUrl?: string | null }) =>
-        request(`/api/auth/register`, { method: "POST", body: JSON.stringify(body) }),
+        request <UserResponse>(`/api/auth/register`, { method: "POST", body: JSON.stringify(body) }),
 };
 
 
