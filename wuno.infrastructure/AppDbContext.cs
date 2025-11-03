@@ -25,6 +25,7 @@ namespace wuno.infrastructure
             b.Entity<Effect>().HasOne(e => e.Player).WithMany().OnDelete(DeleteBehavior.Restrict);
             b.Entity<EmailVerificationToken>().HasOne(t => t.User).WithMany().HasForeignKey(t => t.UserId).OnDelete(DeleteBehavior.Cascade);
 
+
             b.Entity<Turn>().HasOne(t => t.Round).WithMany().HasForeignKey(t => t.RoundId).OnDelete(DeleteBehavior.Restrict);
 
             int finished = (int)GameStatus.FINISHED;
@@ -33,7 +34,7 @@ namespace wuno.infrastructure
             b.Entity<Round>().HasIndex(r => new { r.GameId, r.Index });
             b.Entity<Turn>().HasIndex(t => new { t.GameId, t.Index });
             b.Entity<User>().HasIndex(u => u.EmailNormalized).IsUnique().HasFilter("[EmailNormalized] IS NOT NULL AND [EmailNormalized] <> ''");
-            b.Entity<User>().HasIndex(u => u.Name).IsUnique().HasFilter("[Name] IS NOT NULL AND [Name] <> ''");
+            b.Entity<User>().HasIndex(u => u.NameNormalized).IsUnique().HasFilter("[IsRegistered] = 1 AND [NameNormalized] IS NOT NULL AND [NameNormalized] <> ''");
             b.Entity<EmailVerificationToken>().HasIndex(t => new {t.UserId, t.TokenHash}).IsUnique();
 
             b.Entity<Turn>().Property(t => t.RowVersion).IsRowVersion();

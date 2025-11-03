@@ -9,35 +9,34 @@ namespace Wuno.Application.Games
 {
     public sealed class GroupTracker : IGroupTracker
     {
-        private readonly ConcurrentDictionary<string, PlayerSession> _map = new();
-        public void Add(string connectionId, PlayerSession ps)
+        private readonly ConcurrentDictionary<string, PlayerSession> _byConn = new();
+        private readonly ConcurrentDictionary<Guid, int> _refCounts = new();
+
+        public void Add(string connId, PlayerSession ps)
         {
-            _map[connectionId] = ps;
+            _byConn[connId] = ps;
+            _refCounts.AddOrUpdate(ps.PlayerId, 1, (_, n) => n + 1);
         }
-        public void Remove(string connectionId)
+
+        // returns (playerId, gameId, seat, isLast)
+        public bool Remove(string connId, out PlayerSession ps, out bool isLast)
         {
-            if(_map.TryGetValue(connectionId, out var ps))
-            {
-                _map.TryRemove(connectionId, out _);
-            }
+            isLast = false;
+            if (!_byConn.TryRemove(connId, out var e))
+            { ps = default!; return false; }
+
+            ps = e;
+
+            var after = _refCounts.AddOrUpdate(ps.PlayerId, 0, (_, n) => Math.Max(0, n - 1));
+            if (after == 0) { _refCounts.TryRemove(ps.PlayerId, out _); isLast = true; }
+            return true;
         }
-        public bool TryGet(string connectionId, out PlayerSession session)
+
+        public bool TryGet(string connId, out PlayerSession ps)
         {
-            if(_map.TryGetValue(connectionId, out var ps))
-            {
-                session = ps;
-                return true;
-            }
-            session = default!;
-            return false;
-        }
-        public IEnumerable<PlayerSession> GetConnectionsForGame(Guid gameId)
-        {
-            return _map.Values.Where(ps => ps.GameId == gameId);
-        }
-        public void Clear(string connectionId)
-        {
-            _map.TryRemove(connectionId, out _);
+            if (_byConn.TryGetValue(connId, out var e))
+            { ps = e; return true; }
+            ps = default!; return false;
         }
     }
 }

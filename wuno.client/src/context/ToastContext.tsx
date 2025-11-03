@@ -22,11 +22,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             timeouts.current.delete(id);
         }
     }, []);
-
+    //remove
     const push = useCallback((msg: string) => {
         const id = Date.now() + Math.floor(Math.random() * 1000);
         setToasts((t) => [...t, { id, msg }]);
-        const tid = window.setTimeout(() => remove(id), 4000);
+        const tid = window.setTimeout(() => remove(id), 3000);
         timeouts.current.set(id, tid);
     }, [remove]);
 

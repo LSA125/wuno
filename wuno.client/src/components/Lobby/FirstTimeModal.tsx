@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Api } from "@/api/client";
+import { Guests } from "@/api/client";
 import type { TmpUserRequest, UserResponse } from "@/api/types";
 
 export default function FirstTimeModal({
@@ -22,8 +22,7 @@ export default function FirstTimeModal({
         if (!name.trim()) { setErr("Please enter a username."); return; }
         setBusy(true);
         try {
-            const body: TmpUserRequest = { name: name.trim(), email: email || null, iconUrl: iconUrl || null };
-            const res = await Api.createTempUser(body);
+            const res = await Guests.ensure({ name: name.trim(), email: email || null, iconUrl: iconUrl || null });
             if (res.ok && res.userId) onSuccess(res.userId, res);
             else setErr(res.msg || "Failed to create user.");
         } catch (e: any) {

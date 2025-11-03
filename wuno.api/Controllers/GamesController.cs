@@ -4,6 +4,7 @@ using System.Security.Claims;
 using wuno.domain;
 using Wuno.Application;
 using Wuno.Application.Games;
+using Wuno.Application.Users;
 namespace Wuno.Api.Controllers
 {
 
@@ -31,30 +32,17 @@ namespace Wuno.Api.Controllers
             var state = await _svc.GetGameStateAsync(id, ct);
             return state is null ? NotFound() : Ok(state);
         }
-        [HttpGet("users/{userId:guid}/active-game")]
+        [HttpGet("active-for-current")]
         [AllowAnonymous]
-        public async Task<IActionResult> GetUserActive(Guid userId, CancellationToken ct)
+        public async Task<IActionResult> ActiveForCurrent([FromServices] IAppUserResolver who, CancellationToken ct)
         {
+            if (!who.TryGet(out var userId))
+                return Ok(new GameCodeResponse(false, null, null));
             try
             {
                 return Ok(await _svc.GetUserActiveGameCodeAsync(userId, ct));
             }
-            catch (Exception ex)
-            {
-                return BadRequest(new GameCodeResponse(false, null, null));
-            }
-        }
-        [HttpGet("me/active-game")]
-        [Authorize] // cookie auth
-        public async Task<IActionResult> GetMyActive(CancellationToken ct)
-        {
-            if (!Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
-                return Unauthorized(new { ok = false, reason = "Not signed in." });
-            try
-            {
-                return Ok(await _svc.GetUserActiveGameCodeAsync(userId, ct));
-            }
-            catch (Exception ex)
+            catch
             {
                 return BadRequest(new GameCodeResponse(false, null, null));
             }

@@ -20,7 +20,7 @@ export default function RegisterModal({ open, onClose }: { open: boolean; onClos
     const submit = async () => {
         setErr(null); setBusy(true);
         try {
-            const tempId = getCookie(); // your temp cookie, if present
+            const tempId = getCookie();
             await Auth.register({
                 tempUserId: tempId || undefined,
                 username,
@@ -29,23 +29,26 @@ export default function RegisterModal({ open, onClose }: { open: boolean; onClos
                 iconUrl: iconUrl || null,
             });
 
-            // We’re signed in now (auth cookie set). Hydrate the UI:
             const me: UserResponse = await Auth.me();
             if (!me?.ok) throw new Error("Could not load profile after registration.");
             setUser(normalizeUser(me, true));
 
-            // Clear temp cookie if it existed (we’re on auth cookie now)
+            // Clear temp cookie if it existed
             if (tempId) clearCookie();
 
-            // Route: if a pending join exists, the Landing/GameJoin flow will handle it;
-            // here we just go to lobby by default.
             const pending = getPendingJoin?.();
             if (pending) nav(`/game/${pending}`, { replace: true });
             else nav("/lobby", { replace: true });
 
             onClose();
         } catch (e: any) {
-            setErr(e?.msg || e?.error || "Registration failed.");
+            const err = e as any;
+            setErr(
+                err?.message
+                ?? err?.msg
+                ?? err?.error
+                ?? "Registration failed."
+            );
         } finally {
             setBusy(false);
             setPass(""); // don’t keep password in memory

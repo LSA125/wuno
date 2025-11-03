@@ -44,9 +44,10 @@ namespace Wuno.Application.Users
                 if (emailInUse)
                     return new UserResponse(false, null, null, null, null, "Email is already in use.");
             }
-
-            User? matchingName = _db.Users.AsNoTracking().FirstOrDefault(u => u.Name == name);
-            if (matchingName is not null)
+            var nameTrimmed = name.Trim();
+            var norm = Name.normalize(nameTrimmed);
+            var taken = await _db.Users.AnyAsync(u => u.IsRegistered && u.NameNormalized == norm, ct);
+            if (taken)
             {
                 return new UserResponse(false, null, null, null, null, "Username is already in use.");
             }
@@ -54,12 +55,13 @@ namespace Wuno.Application.Users
             var user = new User
             {
                 Id = Guid.NewGuid(),
-                Name = name?.Trim() ?? "",
+                Name = nameTrimmed,
+                NameNormalized = norm,
                 IconUrl = string.IsNullOrWhiteSpace(icon) ? null : icon!.Trim(),
                 Email = string.IsNullOrWhiteSpace(email) ? null : email!.Trim(),
                 EmailNormalized = emailNorm,
                 LastActiveAt = DateTime.UtcNow,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
             };
 
             _db.Users.Add(user);
