@@ -16,9 +16,11 @@ namespace Wuno.Application.Games
         private readonly AppDbContext _db;
         private readonly IWordList _wl;
         private readonly ICodeGeneratorService _cg;
-        public GameService(AppDbContext db, IWordList wl, ICodeGeneratorService cg)
+        private readonly ITurnTimer _tt;
+        public GameService(AppDbContext db, IWordList wl, ICodeGeneratorService cg, ITurnTimer tt)
         {
             _db = db; _wl = wl; _cg = cg;
+            _tt = tt;
         }
 
         public async Task<Guid> GetGameId(string code, CancellationToken ct)
@@ -47,7 +49,7 @@ namespace Wuno.Application.Games
               .Include(g => g.Players)
               .FirstOrDefaultAsync(g => g.Id == gameId, ct);
             if (game is null) throw new Exception("Game not found");
-            return game.Players.All(p => p.IsActive) && game.Players.Count(p => p.IsActive) >= 2;
+            return game.Players.All(p => p.IsActive || !p.IsTaken) && game.Players.Count(p => p.IsActive) >= 2;
         }
         public async Task<NewGameResponse> StartNewGameAsync(NewGameRequest req, CancellationToken ct)
         {
@@ -69,7 +71,7 @@ namespace Wuno.Application.Games
             if (attempts >= 100) throw new Exception("Failed to generate unique game code");
             game.Code = code;
 
-            for (int i = 1; i <= n; i++) game.Players.Add(new Player { Seat = i, GameId = game.Id });
+            for (int i = 1; i <= n; i++) game.Players.Add(new Player { Seat = i, GameId = game.Id, IsActive = false, IsConnected = false, IsTaken = false });
 
             _db.Games.Add(game);
             await _db.SaveChangesAsync(ct);
@@ -78,16 +80,50 @@ namespace Wuno.Application.Games
         }
         public async Task<TurnState> StartMatchAsync(Guid gameId, CancellationToken ct)
         {
+            var affected = await _db.Games
+                .Where(g => g.Id == gameId && g.Status == GameStatus.WAITING)
+                .ExecuteUpdateAsync(s => s.SetProperty(g => g.Status, _ => GameStatus.ACTIVE), ct);
+
+            if (affected == 0)
+            {
+                var (turnId, _, _) = await GetCurrentTurnInfoAsync(gameId, ct);
+                return await GetTurnAsync(turnId, ct);
+            }
+
+            // 2) We acquired the "start" gate; initialize the round/turn in a transaction.
+            using var tx = await _db.Database.BeginTransactionAsync(ct);
+
             var game = await _db.Games
-              .Include(g => g.Players)
-              .FirstOrDefaultAsync(g => g.Id == gameId, ct);
-            if (game is null) throw new Exception("Game not found");
-            if (game.Status != GameStatus.WAITING) throw new Exception("Game already started");
-            if (game.Players.Count(p => p.IsActive) < 2) throw new Exception("Not enough players ready");
-            TurnState newTurn = await StartRoundAsync(gameId, ct);
-            game.Status = GameStatus.ACTIVE;
+                .AsTracking()
+                .Include(g => g.Players)
+                .Include(g => g.Rounds)
+                .FirstAsync(g => g.Id == gameId, ct);
+
+            // Sanity checks (defensive; should still be true here)
+            if (game.Players.Count(p => p.IsActive) < 2)
+                throw new InvalidOperationException("Not enough players ready");
+
+            foreach (var p in game.Players)
+            {
+                if (p.IsTaken) p.IsActive = true;
+                p.LastWord = null;
+            }
+
+            var round = new Round
+            {
+                GameId = game.Id,
+                Index = game.Rounds.Count,
+                Active = true,
+                StartedAt = DateTime.UtcNow
+            };
+            game.Rounds.Add(round);
+
+            var firstTurn = StartTurn(game, round, prevAcceptedLetter: null, ct);
+
             await _db.SaveChangesAsync(ct);
-            return newTurn;
+            await tx.CommitAsync(ct);
+
+            return firstTurn;
         }
         public async Task<bool> IsMatchEndAsync(Guid gameId, CancellationToken ct)
         {
@@ -112,7 +148,10 @@ namespace Wuno.Application.Games
             // reset players
             foreach (var p in game.Players)
             {
-                p.IsActive = true;
+                if (p.IsTaken)
+                {
+                    p.IsActive = true;
+                }
                 p.LastWord = null;
             }
             // new round
@@ -229,6 +268,17 @@ namespace Wuno.Application.Games
                 return new GameCodeResponse(true, false, null);
             }
             return new GameCodeResponse(true, true, activeGameCode);
+        }
+        public async Task<int> GetCurrentSeatAsync(Guid gameId, CancellationToken ct)
+        {
+            var seat = await _db.Turns
+              .AsNoTracking()
+              .Where(t => t.GameId == gameId && t.EndedAt == null)
+              .OrderByDescending(t => t.Index)
+              .Select(t => t.Seat)
+              .FirstOrDefaultAsync(ct);
+            if (seat == 0) throw new Exception("No active turn found");
+            return seat;
         }
 
         public async Task<SubmitWordResponse> SubmitWordAsync(Guid gameId, Guid roundId, Guid turnId, SubmitWordRequest req, CancellationToken ct)
@@ -391,12 +441,12 @@ namespace Wuno.Application.Games
                 return new JoinGameResponse(player.Id, gameState);
             }
             else if (game.Status != GameStatus.WAITING) throw new Exception("Game not joinable");
-            var inactive = game.Players.FirstOrDefault(p => !p.IsConnected && !p.IsTaken);
+            Player? inactive = game.Players.FirstOrDefault(p => !p.IsConnected && !p.IsTaken);
             if (inactive is null) throw new Exception("Game full");
             inactive.IsActive = true;
             inactive.IsConnected = true;
             inactive.IsTaken = true;
-            inactive.Name = user.Name;
+            inactive.Name = user.Name ?? "Anonymous";
             inactive.IconUrl = user.IconUrl;
             user.ActivePlayer = inactive;
             await _db.SaveChangesAsync(ct);
@@ -456,5 +506,22 @@ namespace Wuno.Application.Games
             return true;
         }
 
+        public async Task ForceEndGame(Guid gameId, CancellationToken ct)
+        {
+            var game = await _db.Games
+              .FirstOrDefaultAsync(g => g.Id == gameId, ct);
+            var allTurns = await _db.Turns
+              .Where(t => t.GameId == gameId && t.EndedAt == null)
+              .ToListAsync(ct);
+            if (game is null) throw new Exception("Game not found");
+            foreach (var turn in allTurns)
+            {
+                turn.EndedAt = DateTime.UtcNow;
+                turn.EndReason = TurnEndReason.END;
+                _tt.Cancel(turn.Id);
+            }
+            game.Status = GameStatus.FINISHED;
+            await _db.SaveChangesAsync(ct);
+        }
     }
 }

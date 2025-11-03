@@ -8,6 +8,7 @@ using wuno.domain;
 using wuno.infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Wuno.Application.Games;
+using Wuno.Domain.Rules;
 
 [ApiController]
 [Route("api/auth")]
@@ -29,7 +30,10 @@ public sealed class AuthController : ControllerBase
         if (string.IsNullOrWhiteSpace(req.Username) || string.IsNullOrWhiteSpace(req.Password))
             return BadRequest(new { msg = "Username and password required." });
 
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Name == req.Username, ct);
+        var username = req.Username.Trim();
+        var norm = Name.normalize(username);
+        var user = await _db.Users.FirstOrDefaultAsync(
+            u => u.IsRegistered && u.NameNormalized == norm, ct);
 
         if (user is null)
             return Unauthorized(new { msg = "Invalid username or password." });
@@ -85,50 +89,52 @@ public sealed class AuthController : ControllerBase
         if (string.IsNullOrWhiteSpace(req.Username) || string.IsNullOrWhiteSpace(req.Password))
             return BadRequest(new { msg = "Username and password are required." });
 
-        // normalize username (optional)
         var username = req.Username.Trim();
+        var norm = Name.normalize(username);
 
-        // enforce unique username (and maybe unique email if you want)
-        var exists = await _db.Users.AnyAsync(u => u.Name == username, ct);
+        var exists = await _db.Users.AnyAsync(
+            u => u.IsRegistered && u.NameNormalized == norm, ct);
         if (exists) return Conflict(new { msg = "Username is already taken." });
 
-        User user;
-
+        User? user;
+        // upgrading guest vs creating new…
         if (req.TempUserId is Guid tempId)
         {
-            // Upgrade existing temp user
-            var maybeUser = await _db.Users.FirstOrDefaultAsync(u => u.Id == tempId, ct);
-            if (maybeUser is null)
-                return NotFound(new { msg = "Temp user not found." });
-            user = maybeUser;
+            user = await _db.Users.FirstOrDefaultAsync(u => u.Id == tempId, ct);
+            if (user is null)
+                return BadRequest(new { msg = "Temporary user not found." });
+
+            user.IsRegistered = true;
             user.Name = username;
+            user.NameNormalized = norm;
+            user.PasswordHash = _hasher.HashPassword(user, req.Password);
             user.Email = string.IsNullOrWhiteSpace(req.Email) ? user.Email : req.Email!.Trim();
             user.IconUrl = string.IsNullOrWhiteSpace(req.IconUrl) ? user.IconUrl : req.IconUrl!.Trim();
-            user.PasswordHash = _hasher.HashPassword(user, req.Password);
         }
         else
         {
-            // Directly create a new registered user
             user = new User
             {
                 Id = Guid.NewGuid(),
+                IsRegistered = true,
                 Name = username,
+                NameNormalized = norm,
                 Email = string.IsNullOrWhiteSpace(req.Email) ? null : req.Email!.Trim(),
                 IconUrl = string.IsNullOrWhiteSpace(req.IconUrl) ? null : req.IconUrl!.Trim(),
-                // other defaults…
+                PasswordHash = null // set below
             };
             user.PasswordHash = _hasher.HashPassword(user, req.Password);
             _db.Users.Add(user);
         }
-
         await _db.SaveChangesAsync(ct);
+
 
         // Sign in via cookie
         var claims = new List<Claim>
-    {
-        new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-        new Claim(ClaimTypes.Name, user.Name ?? string.Empty),
-    };
+        {
+            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new Claim(ClaimTypes.Name, user.Name ?? string.Empty),
+        };
         var id = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(id));
 

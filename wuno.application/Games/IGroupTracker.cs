@@ -11,8 +11,6 @@ namespace Wuno.Application.Games
     {
         void Add(string connectionId, PlayerSession session);
         bool TryGet(string connectionId, out PlayerSession session);
-        void Remove(string connectionId, Guid gameId);
-        IEnumerable<PlayerSession> GetConnectionsForGame(Guid gameId);
-        void Clear(string connectionId);
+        bool Remove(string connectionId, out PlayerSession session, out bool isLast);
     }
 }

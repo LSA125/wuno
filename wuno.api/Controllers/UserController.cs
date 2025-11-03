@@ -38,20 +38,13 @@ namespace Wuno.Api.Controllers
             var res = await _us.CreateUserAsync(req.Name, req.IconUrl, req.Email, ct);
             return res.Ok ? Ok(res) : BadRequest(res);
         }
-        [HttpPost("register/{id:guid}")]
+        [HttpPost("edit/anon")]
         [AllowAnonymous]
-        public async Task<IActionResult> Register([FromBody] RegUserRequest req, CancellationToken ct)
+        public async Task<IActionResult> EditAnon([FromBody] TmpUserRequest req, [FromServices] IAppUserResolver who, CancellationToken ct)
         {
-            if(req.Name == null || req.Pass == null)
-                return BadRequest(new UserResponse(false, null, null, null, null, "Username and password are required for registration."));
-            var res = await _us.RegisterAccountAsync(req.UserId, req.Name, req.Pass, req.Email, req.IconUrl, ct);
-            return res.Ok ? Ok(res) : BadRequest(res);
-        }
-        [HttpPost("edit/anon/{id:guid}")]
-        [AllowAnonymous]
-        public async Task<IActionResult> EditAnon([FromBody] TmpUserRequest req, CancellationToken ct)
-        {
-            var res = await _us.EditAnonUserAsync(req.UserId, req.Name, req.IconUrl, req.Email, ct);
+            if (!who.TryGet(out var userId))
+                return Unauthorized(new UserResponse(false, null, null, null, null, "No identity."));
+            var res = await _us.EditAnonUserAsync(userId, req.Name, req.IconUrl, req.Email, ct);
             return res.Ok ? Ok(res) : BadRequest(res);
         }
         [HttpPost("edit/registered")]

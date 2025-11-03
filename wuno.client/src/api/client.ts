@@ -41,26 +41,14 @@ export const Api = {
     // Users
     getUser: (id: string) => request<UserResponse>(`/api/users/${id}`, { method: "GET" }),
     createTempUser: (body: TmpUserRequest) => request<UserResponse>(`/api/users/new`, { method: "POST", body: JSON.stringify(body) }),
-    register: (id: string, body: RegUserRequest) => request<UserResponse>(`/api/users/register/${id}`, { method: "POST", body: JSON.stringify(body) }),
-    editAnon: (id: string, body: TmpUserRequest) => request<UserResponse>(`/api/users/edit/anon/${id}`, { method: "POST", body: JSON.stringify(body) }),
+    editAnon: (id: string, body: TmpUserRequest) => request<UserResponse>(`/api/users/edit/anon`, { method: "POST", body: JSON.stringify(body) }),
     editRegistered: (id: string, body: RegUserRequest) => request<UserResponse>(`/api/users/edit/registered/${id}`, { method: "POST", body: JSON.stringify(body) }),
 
 
     // Games
     createGame: (req: NewGameRequest) => request<NewGameResponse>(`/api/games/new`, { method: "POST", body: JSON.stringify(req) }),
-    getGameState: (id: string) => request(`/api/games/id/${id}`, { method: "POST" }), // matches GamesController.Get
-    meActiveGame: () =>
-        request<GameCodeResponse>(
-            `/api/games/me/active-game`,
-            { method: "GET" },
-            { ignore401: true }
-        ),
-    guestActiveGame: (userId: string) =>
-        request<GameCodeResponse>(
-            `/api/games/users/${userId}/active-game`,
-            { method: "GET" }
-        ),
-
+    getGameState: (id: string) => request(`/api/games/id/${id}`, { method: "POST" }),
+    activeForCurrent: () => request<GameCodeResponse>(`/api/games/active-for-current`, { method: "GET" }),
 };
 
 export const Auth = {
@@ -71,6 +59,12 @@ export const Auth = {
     meSafe: () => request<UserResponse>(`/api/auth/me`, { method: "GET" }, { ignore401: true }),
     register: (body: { tempUserId?: string; username: string; password: string; email?: string | null; iconUrl?: string | null }) =>
         request <UserResponse>(`/api/auth/register`, { method: "POST", body: JSON.stringify(body) }),
+};
+
+export const Guests = {
+    ensure: (b: { name: string; email?: string | null; iconUrl?: string | null }) =>
+        request<UserResponse>(`/api/guests/ensure`, { method: "POST", body: JSON.stringify(b) }),
+    me: () => request<UserResponse>(`/api/guests/me`, { method: "GET" }),
 };
 
 

@@ -4,29 +4,39 @@ import EffectChip from "./pieces/EffectChip";
 import RequiredLengthGauge from "./pieces/RequiredLengthGauge";
 import PlayerTypingRow from "./pieces/PlayerTypingRow";
 
-export default function LiveGame({
-    state,
-    meSeat,
-    typedBySeat,
-    onType,
-    onSubmit,
-    effectsFlash,
-    ended,
-}: {
-    state: GameState;
-    meSeat: number;
-    typedBySeat: Record<number, string>;
-    onType: (seat: number, word: string) => void;
-    onSubmit: (word: string) => void;
-    effectsFlash: string[];
-    ended: boolean;
-}) {
-    const [input, setInput] = useState("");
+export default function LiveGame({ ...props }) {
+    const { state, meSeat, typedBySeat, onType, onSubmit, effectsFlash, ended } = props;
 
     const turn = state.currentTurn;
-    const myTurn = meSeat === turn.seat;
-    const startLetter = turn.freeStart ? null : (state.players.find(p => p.seat === turn.seat)?.lastWord?.slice(-1) ?? null);
+    const players = state.players;
 
+    if (!turn) {
+        // Turn not ready yet – show a lightweight placeholder
+        return (
+            <section className="grid lg:grid-cols-3 gap-4">
+                <div className="card shadow lg:col-span-2">
+                    <div className="card-header">
+                        <h5 className="card-title mb-0">Round {state.currentRound.index + 1}</h5>
+                    </div>
+                    <div className="card-body">
+                        <div className="text-muted">Preparing next turn…</div>
+                        <ul className="divide-y mt-3">
+                            {players.map(p => (
+                                <PlayerTypingRow key={p.playerId} player={p} isCurrent={false} typed={typedBySeat[p.seat] || ""} />
+                            ))}
+                        </ul>
+                    </div>
+                </div>
+                <div className="card shadow">
+                    <div className="card-body text-muted">Please wait…</div>
+                </div>
+            </section>
+        );
+    }
+
+    const myTurn = meSeat === turn.seat;
+    const startLetter = turn.freeStart ? null : (players.find(p => p.seat === turn.seat)?.lastWord?.slice(-1) ?? null);
+    const [input, setInput] = useState("");
     const myTyped = typedBySeat[turn.seat] ?? (myTurn ? input : "");
     const minLen = turn.minLen;
 

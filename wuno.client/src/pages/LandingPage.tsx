@@ -73,7 +73,6 @@ export default function LandingPage() {
     }, [nav, setUser]);
 
     const afterAuth = async (id: string, ures: UserResponse) => {
-        setCookie(id);
         const u = normalizeUser(ures, false);
         setUser(u);
         const auto = await tryAutoRejoin(u);

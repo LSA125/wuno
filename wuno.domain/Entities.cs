@@ -5,7 +5,8 @@ namespace wuno.domain
     public sealed class User
     {
         public Guid Id { get; init; } = Guid.NewGuid();
-        public string Name { get; set; } = "";
+        public string? Name { get; set; }
+        public string? NameNormalized { get; set; }
         public string? IconUrl { get; set; }
 
         public string? Email { get; set; }
@@ -13,6 +14,7 @@ namespace wuno.domain
         public DateTime? EmailVerifiedAt { get; set; }
 
         public string? PasswordHash { get; set; }
+        public bool IsRegistered { get; set; } = false;
         public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
         public DateTime LastActiveAt { get; set; } = DateTime.UtcNow;
 

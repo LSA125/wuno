@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.SignalR;
+using System.Security.Claims;
 using wuno.infrastructure;
 using Wuno.Application.Games;
 
@@ -19,65 +20,67 @@ namespace Wuno.Api.Hubs
             _typingGate = typingGate;
             _turnTimer = turnTimer;
         }
-        private async Task<(Guid gameId, Guid playerId, int seat)> GetCallerAsync(CancellationToken ct)
+        private PlayerSession RequireSession()
         {
-            // playerId from your connection tracker
-            var playerId = _tracker.Get(Context.ConnectionId);
-
-            // Look up game & seat server-side
-            using var scope = Context.GetHttpContext()!.RequestServices.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-            var p = await db.Players
-                .Where(x => x.Id == playerId)
-                .Select(x => new { x.GameId, x.Seat })
-                .FirstOrDefaultAsync(ct) ?? throw new HubException("Player not found.");
-
-            return (p.GameId, playerId, p.Seat);
+            if (!_tracker.TryGet(Context.ConnectionId, out var ps))
+                throw new HubException("Not joined.");
+            return ps;
         }
-        public async Task ConnectToGame(string gameCode, Guid userId)
+        public async Task ConnectToGame(string gameCode)
         {
             var ct = Context.ConnectionAborted;
+            var sub = Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!Guid.TryParse(sub, out var userId))
+            {
+                await Clients.Caller.SendAsync("ConnectionFailed", "Please pick a guest name first.");
+                return;
+            }
             try
             {
                 Guid gameId = await _svc.GetGameId(gameCode, ct);
-                var res = await _svc.JoinGameAsync(gameId, userId, ct);
-                _tracker.Add(Context.ConnectionId, res.PlayerId);
+                JoinGameResponse res = await _svc.JoinGameAsync(gameId, userId, ct);
+                int seat = res.State.Players.First(p => p.PlayerId == res.PlayerId).Seat;
+                PlayerSession ps = new(gameId, res.PlayerId, seat, userId);
+
+                _tracker.Add(Context.ConnectionId, ps);
                 await Groups.AddToGroupAsync(Context.ConnectionId, $"game:{gameId}", ct);
+
                 await Clients.Caller.SendAsync("ConnectedToGame", res, ct);
                 await Clients.Group($"game:{gameId}").SendAsync("PlayersUpdated", res.State.Players, ct);
             }
             catch (Exception ex)
             {
                 await Clients.Caller.SendAsync("ConnectionFailed", ex.Message, ct);
-                return;
             }
         }
-        public async Task LeaveGame(Guid gameId, Guid playerId)
+        public async Task LeaveGame(Guid gameId)
         {
             var ct = Context.ConnectionAborted;
-            _tracker.Remove(Context.ConnectionId, gameId);
-            await _svc.LeaveGameAsync(gameId, playerId, ct);
+            var ps = RequireSession();
+            var playerId = ps.PlayerId;
+            await _svc.LeaveGameAsync(ps.UserId, ct);
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"game:{gameId}", ct);
             var players = await _svc.GetPlayersAsync(gameId, ct);
+            if(players.Count == 0)
+            {
+                await _svc.ForceEndGame(gameId, ct);
+                return;
+            }
             await Clients.Group($"game:{gameId}").SendAsync("PlayersUpdated", players, ct);
         }
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
-            var tasks = _tracker.Get(Context.ConnectionId).Select(async playerId =>
-            {
-                var res = await _svc.DisconnectProtocolAsync(playerId, CancellationToken.None);
-                await Clients.Group($"game:{res.gameId}").SendAsync("PlayerDisconnected", res.players);
-            });
-
-            await Task.WhenAll(tasks);
-            _tracker.Clear(Context.ConnectionId);
+            var ps = RequireSession();
+            var ct = Context.ConnectionAborted;
+            var res = await _svc.DisconnectProtocolAsync(ps.PlayerId, ct);
+            await Clients.Group($"game:{ps.GameId}").SendAsync("PlayersUpdated", res.players, ct);
             await base.OnDisconnectedAsync(exception);
         }
-        public async Task Ready(Guid gameId, int seat, bool isReady)
+        public async Task Ready(Guid gameId, bool isReady)
         {
             var ct = Context.ConnectionAborted;
-            await _svc.ReadyAsync(gameId, seat, isReady, ct);
+            var ps = RequireSession();
+            await _svc.ReadyAsync(ps.GameId, ps.Seat, isReady, ct);
 
             if (await _svc.AreAllPlayersReadyAsync(gameId, ct))
             {
@@ -85,7 +88,7 @@ namespace Wuno.Api.Hubs
                 {
                     var timer = 3000;
                     await _hub.Clients.Group($"game:{gameId}").SendAsync("AllPlayersReady", timer, ct);
-                    Task.Delay(timer, ct).Wait(ct);
+                    await Task.Delay(timer, ct);
                     var turn = await _svc.StartMatchAsync(gameId, ct);
                     var state = await _svc.GetGameStateAsync(gameId, ct);
                     await _hub.Clients.Group($"game:{gameId}").SendAsync("MatchStarted", state, ct);
@@ -102,10 +105,11 @@ namespace Wuno.Api.Hubs
                 await _hub.Clients.Group($"game:{gameId}").SendAsync("PlayersUpdated", players, ct);
             }
         }
-        public async Task SubmitWord(Guid gameId, Guid roundId, Guid turnId, int seat, string word)
+        public async Task SubmitWord(Guid gameId, Guid roundId, Guid turnId, string word)
         {
             var ct = Context.ConnectionAborted;
-            var res = await _svc.SubmitWordAsync(gameId, roundId, turnId, new SubmitWordRequest(seat, word), ct);
+            var ps = RequireSession();
+            SubmitWordResponse res = await _svc.SubmitWordAsync(gameId, roundId, turnId, new SubmitWordRequest(ps.Seat, word), ct);
             if (!res.Ok)
             {
                 await Clients.Caller.SendAsync("WordRejected", res.Reason, ct);
@@ -141,12 +145,17 @@ namespace Wuno.Api.Hubs
         public async Task WordChanged(string word)
         {
             var ct = Context.ConnectionAborted;
-            //check if 50ms have passed since last change
+            var ps = RequireSession();
+            //make sure its the users turn
+            if (ps.Seat != await _svc.GetCurrentSeatAsync(ps.GameId, ct))
+            {
+                return;
+            }
             if (!_typingGate.tryAllow(Context.ConnectionId, TimeSpan.FromMilliseconds(100)))
             {
                 return;
             }
-            await Clients.OthersInGroup(Context.ConnectionId).SendAsync("WordChanged", word, ct);
+            await Clients.OthersInGroup($"game:{ps.GameId}").SendAsync("WordChanged", word, ct);
         }
 
         private async Task BroadcastAfterTimeout(Guid gameId, Guid turnId)

@@ -1,3 +1,7 @@
 Fix spoof vulnerability.
 
+Make players not ready when joining.
+
+Fix database operation was expected to effect 1 row but affected 0 rows when startmatch is invoked.
+
 add leave game function.
