@@ -41,10 +41,7 @@ The app focuses on quick joins (guest mode), deterministic gameplay logic, robus
 
 Screenshots are available under the `/screenshots` directory:
 
-- Landing (`Landing.png`)  
-- Create or Join (`CreateModal.png`)  
-- Lobby (`lobby.png`)  
-- Waiting Room (`WaitingRoom.png`)  
+![landing](https://github.com/LSA125/wuno/blob/master/screenshots/CreateModal.png)
 
 Each image shows different parts of the game flow, from landing to gameplay setup.
 
