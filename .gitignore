@@ -365,3 +365,4 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/wuno.api/keys/key-c5b0ab69-9c12-4397-bc6a-9aded36f30bb.xml

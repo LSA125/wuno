@@ -1,9 +1,13 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿// Controllers/GuestsController.cs
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.WebUtilities;
+using Wuno.Api.Middleware; // CookieName
 using Wuno.Infrastructure; // AppDbContext
 using wuno.domain;         // User entity
 using Wuno.Application.Users;
@@ -16,10 +20,12 @@ using wuno.infrastructure;
 public sealed class GuestsController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly IDataProtector _prot;
 
     public GuestsController(AppDbContext db)
     {
         _db = db;
+        _prot = dp.CreateProtector("guest-id-v1");
     }
 
     public sealed record EnsureGuestReq(string Name, string? Email, string? IconUrl);
@@ -32,6 +38,8 @@ public sealed class GuestsController : ControllerBase
 
         // If already signed-in, reuse that user
         Guid userId;
+
+        // If already signed-in (maybe by AutoGuestSignIn), reuse that user
         var sub = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (Guid.TryParse(sub, out var parsed))
         {
@@ -46,6 +54,7 @@ public sealed class GuestsController : ControllerBase
                 Name = body.Name.Trim(),
                 Email = string.IsNullOrWhiteSpace(body.Email) ? null : body.Email.Trim(),
                 IconUrl = string.IsNullOrWhiteSpace(body.IconUrl) ? null : body.IconUrl.Trim(),
+                // PasswordHash remains null for guest
             };
             _db.Users.Add(uNew);
             await _db.SaveChangesAsync(ct);
