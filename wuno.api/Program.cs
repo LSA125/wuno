@@ -104,9 +104,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 app.UseCors("spa");
+app.UseMiddleware<EnsureGuestCookieMiddleware>(); // ensures gid exists
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseMiddleware<EnsureGuestCookieMiddleware>(); // ensures gid exists
+
 
 app.Use(async (ctx, next) =>
 {
