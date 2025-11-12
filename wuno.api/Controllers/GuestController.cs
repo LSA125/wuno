@@ -1,16 +1,10 @@
-﻿// Controllers/GuestsController.cs
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
-using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.WebUtilities;
-using Wuno.Api.Middleware; // CookieName
-using Wuno.Infrastructure; // AppDbContext
-using wuno.domain;         // User entity
-using Wuno.Application.Users;
+using wuno.domain;
 using Wuno.Application.Games;
 using wuno.infrastructure;
 
