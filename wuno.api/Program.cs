@@ -10,6 +10,7 @@ using wuno.infrastructure;
 using Wuno.Api.Hubs;
 using Wuno.Api.Middleware;
 using Wuno.Application.Games;
+using Wuno.Application.Games.Inheritance;
 using Wuno.Application.Users;
 
 var builder = WebApplication.CreateBuilder(args);

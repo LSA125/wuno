@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using wuno.domain.Rules;
+using Wuno.Application.Games.Inheritance;
 
 namespace Wuno.Application.Games
 {

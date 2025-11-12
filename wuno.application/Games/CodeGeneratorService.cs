@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using wuno.domain;
 using wuno.infrastructure;
+using Wuno.Application.Games.Inheritance;
 
 namespace Wuno.Application.Games
 {

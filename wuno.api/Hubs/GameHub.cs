@@ -1,20 +1,22 @@
 ﻿using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
-using wuno.infrastructure;
 using Wuno.Application.Games;
+using Wuno.Application.Games.Inheritance;
 
 namespace Wuno.Api.Hubs
 {
     public class GameHub : Hub
     {
         private readonly IGameService _svc;
+        private readonly IServiceScopeFactory _sf;
         private readonly IHubContext<GameHub> _hub;
         private readonly IGroupTracker _tracker;
         private readonly ITypingGate _typingGate;
         private readonly ITurnTimer _turnTimer;
-        public GameHub(IGameService svc, IHubContext<GameHub> hub, IGroupTracker tracker, ITypingGate typingGate, ITurnTimer turnTimer)
+        public GameHub(IGameService svc, IServiceScopeFactory sf, IHubContext<GameHub> hub, IGroupTracker tracker, ITypingGate typingGate, ITurnTimer turnTimer)
         {
             _svc = svc;
+            _sf = sf;
             _hub = hub;
             _tracker = tracker;
             _typingGate = typingGate;
@@ -86,10 +88,11 @@ namespace Wuno.Api.Hubs
             {
                 try
                 {
+                    if (!await _svc.MarkMatchAsStartedAsync(gameId, ct)) return;
                     var timer = 3000;
                     await _hub.Clients.Group($"game:{gameId}").SendAsync("AllPlayersReady", timer, ct);
                     await Task.Delay(timer, ct);
-                    var turn = await _svc.StartMatchAsync(gameId, ct);
+                    TurnState turn = await _svc.StartMatchAsync(gameId, ct);
                     var state = await _svc.GetGameStateAsync(gameId, ct);
                     await _hub.Clients.Group($"game:{gameId}").SendAsync("MatchStarted", state, ct);
                     _turnTimer.Schedule(gameId, turn.TurnId, turn.DueAt, BroadcastAfterTimeout);

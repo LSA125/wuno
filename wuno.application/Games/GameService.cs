@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using wuno.domain;
 using wuno.domain.Rules;
 using wuno.infrastructure;
+using Wuno.Application.Games.Inheritance;
 
 namespace Wuno.Application.Games
 {
@@ -79,81 +80,45 @@ namespace Wuno.Application.Games
 
             return new NewGameResponse(game.Code, 1, n, game.TargetWins);
         }
+        public async Task<bool> MarkMatchAsStartedAsync(Guid gameId, CancellationToken ct)
+        {
+            var affected = await _db.Games
+                .Where(g => g.Id == gameId && g.Status == GameStatus.WAITING)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(g => g.Status, _ => GameStatus.ACTIVE), ct);
+            return affected > 0;
+        }
         public async Task<TurnState> StartMatchAsync(Guid gameId, CancellationToken ct)
         {
-            using var tx = await _db.Database.BeginTransactionAsync(ct);
-            try
+            var game = await _db.Games
+                .AsNoTracking()
+                .Include(g => g.Players)
+                .Include(g => g.Rounds)
+                .Include(g => g.Turns)
+                .FirstAsync(g => g.Id == gameId, ct);
+                
+            foreach (var p in game.Players)
             {
-                var game = await _db.Games
-                    .AsTracking()
-                    .Include(g => g.Players)
-                    .Include(g => g.Rounds)
-                    .Include(g => g.Turns)
-                    .FirstAsync(g => g.Id == gameId, ct);
-                if (game.Status != GameStatus.WAITING)
+                if (p.IsTaken)
                 {
-                    return await ReturnExistingActiveTurnAsync(tx, gameId, ct);
+                    p.IsActive = true;
                 }
-
-                if (game.Players.Count(p => p.IsActive) < 2)
-                {
-                    throw new Exception("Too few players to start game");
-                }
-
-                var statusUpdated = await _db.Games
-                    .Where(g => g.Id == gameId && g.Status == GameStatus.WAITING)
-                    .ExecuteUpdateAsync(setters => setters.SetProperty(g => g.Status, GameStatus.ACTIVE), ct);
-
-                if (statusUpdated == 0)
-                {
-                    return await ReturnExistingActiveTurnAsync(tx, gameId, ct);
-                }
-
-                game.Status = GameStatus.ACTIVE;
-                var statusProp = _db.Entry(game).Property(g => g.Status);
-                statusProp.IsModified = false;
-                statusProp.CurrentValue = GameStatus.ACTIVE;
-                foreach (var p in game.Players)
-                {
-                    if (p.IsTaken)
-                    {
-                        p.IsActive = true;
-                    }
-                    p.LastWord = null;
-                }
-
-                var round = new Round
-                {
-                    GameId = game.Id,
-                    Index = game.Rounds.Count,
-                    Active = true,
-                    StartedAt = DateTime.UtcNow
-                };
-                game.Rounds.Add(round);
-
-                var firstTurn = StartTurn(game, round, prevAcceptedLetter: null, ct);
-
-                await _db.SaveChangesAsync(ct);
-                await tx.CommitAsync(ct);
-
-                return firstTurn;
+                p.LastWord = null;
             }
-            catch (DbUpdateConcurrencyException)
+
+            var round = new Round
             {
-                return await ReturnExistingActiveTurnAsync(tx, gameId, ct);
-            }
-            catch
-            {
-                await tx.RollbackAsync(ct);
-                throw;
-            }
-        }
-        private async Task<TurnState> ReturnExistingActiveTurnAsync(IDbContextTransaction tx, Guid gameId, CancellationToken ct)
-        {
-            await tx.RollbackAsync(ct);
-            _db.ChangeTracker.Clear();
-            var (turnId, _, _) = await GetCurrentTurnInfoAsync(gameId, ct);
-            return await GetTurnAsync(turnId, ct);
+                GameId = game.Id,
+                Index = game.Rounds.Count,
+                Active = true,
+                StartedAt = DateTime.UtcNow
+            };
+            game.Rounds.Add(round);
+
+            TurnState firstTurn = StartTurn(game, round, prevAcceptedLetter: null, ct);
+
+            await _db.SaveChangesAsync(ct);
+            return firstTurn;
         }
         public async Task<bool> IsMatchEndAsync(Guid gameId, CancellationToken ct)
         {

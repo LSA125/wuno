@@ -4,6 +4,7 @@ using System.Security.Claims;
 using wuno.domain;
 using Wuno.Application;
 using Wuno.Application.Games;
+using Wuno.Application.Games.Inheritance;
 using Wuno.Application.Users;
 namespace Wuno.Api.Controllers
 {

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using wuno.domain;
 using wuno.infrastructure;
 
-namespace Wuno.Application.Games
+namespace Wuno.Application.Games.Inheritance
 {
     public interface IGameService
     {
@@ -14,6 +14,7 @@ namespace Wuno.Application.Games
         Task ReadyAsync(Guid gameId, int seat, bool isReady, CancellationToken ct);
         Task<bool> AreAllPlayersReadyAsync(Guid gameId, CancellationToken ct);
         Task<NewGameResponse> StartNewGameAsync(NewGameRequest req, CancellationToken ct);
+        Task<bool> MarkMatchAsStartedAsync(Guid gameId, CancellationToken ct);
         Task<TurnState> StartMatchAsync(Guid gameId, CancellationToken ct);
         Task<bool> IsMatchEndAsync(Guid gameId, CancellationToken ct);
         Task EndMatchAsync(Guid gameId, CancellationToken ct);
