@@ -443,7 +443,7 @@ namespace Wuno.Application.Games
             else if (game.Status != GameStatus.WAITING) throw new Exception("Game not joinable");
             Player? inactive = game.Players.FirstOrDefault(p => !p.IsConnected && !p.IsTaken);
             if (inactive is null) throw new Exception("Game full");
-            inactive.IsActive = true;
+            inactive.IsActive = false;
             inactive.IsConnected = true;
             inactive.IsTaken = true;
             inactive.Name = user.Name ?? "Anonymous";
