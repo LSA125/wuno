@@ -20,12 +20,9 @@ using wuno.infrastructure;
 public sealed class GuestsController : ControllerBase
 {
     private readonly AppDbContext _db;
-    private readonly IDataProtector _prot;
-
     public GuestsController(AppDbContext db)
     {
         _db = db;
-        _prot = dp.CreateProtector("guest-id-v1");
     }
 
     public sealed record EnsureGuestReq(string Name, string? Email, string? IconUrl);
