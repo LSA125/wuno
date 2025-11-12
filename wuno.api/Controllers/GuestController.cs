@@ -14,7 +14,6 @@ using wuno.infrastructure;
 public sealed class GuestsController : ControllerBase
 {
     private readonly AppDbContext _db;
-
     public GuestsController(AppDbContext db)
     {
         _db = db;

@@ -1,5 +1,6 @@
 ﻿using Azure.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -80,50 +81,79 @@ namespace Wuno.Application.Games
         }
         public async Task<TurnState> StartMatchAsync(Guid gameId, CancellationToken ct)
         {
-            var affected = await _db.Games
-                .Where(g => g.Id == gameId && g.Status == GameStatus.WAITING)
-                .ExecuteUpdateAsync(s => s.SetProperty(g => g.Status, _ => GameStatus.ACTIVE), ct);
-
-            if (affected == 0)
-            {
-                var (turnId, _, _) = await GetCurrentTurnInfoAsync(gameId, ct);
-                return await GetTurnAsync(turnId, ct);
-            }
-
-            // 2) We acquired the "start" gate; initialize the round/turn in a transaction.
             using var tx = await _db.Database.BeginTransactionAsync(ct);
-
-            var game = await _db.Games
-                .AsTracking()
-                .Include(g => g.Players)
-                .Include(g => g.Rounds)
-                .FirstAsync(g => g.Id == gameId, ct);
-
-            // Sanity checks (defensive; should still be true here)
-            if (game.Players.Count(p => p.IsActive) < 2)
-                throw new InvalidOperationException("Not enough players ready");
-
-            foreach (var p in game.Players)
+            try
             {
-                if (p.IsTaken) p.IsActive = true;
-                p.LastWord = null;
+                var game = await _db.Games
+                    .AsTracking()
+                    .Include(g => g.Players)
+                    .Include(g => g.Rounds)
+                    .Include(g => g.Turns)
+                    .FirstAsync(g => g.Id == gameId, ct);
+                if (game.Status != GameStatus.WAITING)
+                {
+                    return await ReturnExistingActiveTurnAsync(tx, gameId, ct);
+                }
+
+                if (game.Players.Count(p => p.IsActive) < 2)
+                {
+                    throw new Exception("Too few players to start game");
+                }
+
+                var statusUpdated = await _db.Games
+                    .Where(g => g.Id == gameId && g.Status == GameStatus.WAITING)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(g => g.Status, GameStatus.ACTIVE), ct);
+
+                if (statusUpdated == 0)
+                {
+                    return await ReturnExistingActiveTurnAsync(tx, gameId, ct);
+                }
+
+                game.Status = GameStatus.ACTIVE;
+                var statusProp = _db.Entry(game).Property(g => g.Status);
+                statusProp.IsModified = false;
+                statusProp.CurrentValue = GameStatus.ACTIVE;
+                foreach (var p in game.Players)
+                {
+                    if (p.IsTaken)
+                    {
+                        p.IsActive = true;
+                    }
+                    p.LastWord = null;
+                }
+
+                var round = new Round
+                {
+                    GameId = game.Id,
+                    Index = game.Rounds.Count,
+                    Active = true,
+                    StartedAt = DateTime.UtcNow
+                };
+                game.Rounds.Add(round);
+
+                var firstTurn = StartTurn(game, round, prevAcceptedLetter: null, ct);
+
+                await _db.SaveChangesAsync(ct);
+                await tx.CommitAsync(ct);
+
+                return firstTurn;
             }
-
-            var round = new Round
+            catch (DbUpdateConcurrencyException)
             {
-                GameId = game.Id,
-                Index = game.Rounds.Count,
-                Active = true,
-                StartedAt = DateTime.UtcNow
-            };
-            game.Rounds.Add(round);
-
-            var firstTurn = StartTurn(game, round, prevAcceptedLetter: null, ct);
-
-            await _db.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
-
-            return firstTurn;
+                return await ReturnExistingActiveTurnAsync(tx, gameId, ct);
+            }
+            catch
+            {
+                await tx.RollbackAsync(ct);
+                throw;
+            }
+        }
+        private async Task<TurnState> ReturnExistingActiveTurnAsync(IDbContextTransaction tx, Guid gameId, CancellationToken ct)
+        {
+            await tx.RollbackAsync(ct);
+            _db.ChangeTracker.Clear();
+            var (turnId, _, _) = await GetCurrentTurnInfoAsync(gameId, ct);
+            return await GetTurnAsync(turnId, ct);
         }
         public async Task<bool> IsMatchEndAsync(Guid gameId, CancellationToken ct)
         {
