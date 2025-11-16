@@ -8,15 +8,13 @@ namespace Wuno.Api.Hubs
     public class GameHub : Hub
     {
         private readonly IGameService _svc;
-        private readonly IServiceScopeFactory _sf;
         private readonly IHubContext<GameHub> _hub;
         private readonly IGroupTracker _tracker;
         private readonly ITypingGate _typingGate;
         private readonly ITurnTimer _turnTimer;
-        public GameHub(IGameService svc, IServiceScopeFactory sf, IHubContext<GameHub> hub, IGroupTracker tracker, ITypingGate typingGate, ITurnTimer turnTimer)
+        public GameHub(IGameService svc, IHubContext<GameHub> hub, IGroupTracker tracker, ITypingGate typingGate, ITurnTimer turnTimer)
         {
             _svc = svc;
-            _sf = sf;
             _hub = hub;
             _tracker = tracker;
             _typingGate = typingGate;

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { GameState } from "@/api/types";
+import type { GameState, PlayerState } from "@/api/types";
 import EffectChip from "./pieces/EffectChip";
 import RequiredLengthGauge from "./pieces/RequiredLengthGauge";
 import PlayerTypingRow from "./pieces/PlayerTypingRow";
@@ -21,7 +21,7 @@ export default function LiveGame({ ...props }) {
                     <div className="card-body">
                         <div className="text-muted">Preparing next turn…</div>
                         <ul className="divide-y mt-3">
-                            {players.map(p => (
+                            {players.map((p:PlayerState) => (
                                 <PlayerTypingRow key={p.playerId} player={p} isCurrent={false} typed={typedBySeat[p.seat] || ""} />
                             ))}
                         </ul>
@@ -35,7 +35,7 @@ export default function LiveGame({ ...props }) {
     }
 
     const myTurn = meSeat === turn.seat;
-    const startLetter = turn.freeStart ? null : (players.find(p => p.seat === turn.seat)?.lastWord?.slice(-1) ?? null);
+    const startLetter = turn.freeStart ? null : (players.find((p: PlayerState) => p.seat === turn.seat)?.lastWord?.slice(-1) ?? null);
     const [input, setInput] = useState("");
     const myTyped = typedBySeat[turn.seat] ?? (myTurn ? input : "");
     const minLen = turn.minLen;
@@ -58,7 +58,7 @@ export default function LiveGame({ ...props }) {
                 </div>
                 <div className="card-body">
                     <ul className="divide-y">
-                        {state.players.map(p => (
+                        {state.players.map((p: PlayerState) => (
                             <PlayerTypingRow
                                 key={p.playerId}
                                 player={p}
