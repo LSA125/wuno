@@ -1,7 +1,4 @@
-Fix spoof vulnerability.
+1. Continue refactoring to add effects to the client side messages.
 
-Make players not ready when joining.
-
-Fix database operation was expected to effect 1 row but affected 0 rows when startmatch is invoked.
-
-add leave game function.
+2. Add client side cache for words played the current round. 
+Add hub endpoint for hydrating the client cache.

@@ -33,6 +33,7 @@ namespace wuno.infrastructure
             b.Entity<Player>().HasIndex(p => new { p.GameId, p.Seat }).IsUnique();
             b.Entity<Round>().HasIndex(r => new { r.GameId, r.Index });
             b.Entity<Turn>().HasIndex(t => new { t.GameId, t.Index });
+            b.Entity<Turn>().HasIndex(t => new {t.RoundId, t.Word}).IsUnique().HasFilter("[RoundId] IS NOT NULL AND [Word] IS NOT NULL AND [Word] <> ''");
             b.Entity<User>().HasIndex(u => u.EmailNormalized).IsUnique().HasFilter("[EmailNormalized] IS NOT NULL AND [EmailNormalized] <> ''");
             b.Entity<User>().HasIndex(u => u.NameNormalized).IsUnique().HasFilter("[IsRegistered] = 1 AND [NameNormalized] IS NOT NULL AND [NameNormalized] <> ''");
             b.Entity<EmailVerificationToken>().HasIndex(t => new {t.UserId, t.TokenHash}).IsUnique();

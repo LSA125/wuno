@@ -86,7 +86,7 @@ namespace wuno.domain
         public byte[] RowVersion { get; set; } = default!;
         public int Index { get; set; }
         public int Seat { get; set; }
-        public char? StartLetter { get; set; } // null = any / free-start
+        public string? LastWord { get; set; } // null = any / free-start
         public int MinLen { get; set; } = 1;
         public bool FreeStart { get; set; }
         public DateTime StartedAt { get; set; }

@@ -230,6 +230,8 @@ export default function GamePage() {
         );
     }
 
+    const inLivePhase = phase === "playing" || phase === "ended";
+
     return (
         <div className="container mx-auto px-3 py-6">
             {/* Top layout bar with code + Leave */}
@@ -238,15 +240,17 @@ export default function GamePage() {
                     <span className="font-semibold">Game</span>{" "}
                     <span className="opacity-80">#{(code ?? "").toUpperCase()}</span>
                 </div>
-                <button
-                    type="button"
-                    className="btn btn-outline-danger"
-                    onClick={leaveGame}
-                    disabled={!hubRef.current || hubRef.current.state !== "Connected"}
-                    title="Leave this game and return to the lobby"
-                >
-                    Leave game
-                </button>
+                {!inLivePhase && (
+                    <button
+                        type="button"
+                        className="btn btn-outline-danger"
+                        onClick={leaveGame}
+                        disabled={!hubRef.current || hubRef.current.state !== "Connected"}
+                        title="Leave this game and return to the lobby"
+                    >
+                        Leave game
+                    </button>
+                )}
             </div>
 
             {/* existing phase renderers */}
@@ -266,15 +270,18 @@ export default function GamePage() {
                 />
             )}
 
-            {(phase === "playing" || phase === "ended") && state.currentTurn && (
+            {inLivePhase && (
                 <LiveGame
                     state={state}
                     meSeat={meSeat ?? 0}
                     typedBySeat={typedBySeat}
                     onType={onLocalType}
                     onSubmit={submitWord}
+                    onLeave={leaveGame}
+                    canLeave={!!hubRef.current && hubRef.current.state === "Connected"}
                     effectsFlash={effectsFlash}
                     ended={phase === "ended"}
+                    currentTurn={state.currentTurn ?? null}
                 />
             )}
         </div>

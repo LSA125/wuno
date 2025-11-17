@@ -1,38 +1,57 @@
 import type { PlayerState } from "@/api/types";
 
-export default function PlayerTypingRow({
-    player,
-    isCurrent,
-    typed,
-}: {
+type PlayerTypingRowProps = {
     player: PlayerState;
-    isCurrent: boolean;
     typed: string;
-}) {
-    return (
-        <li className="py-3 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-                <img src={player.iconUrl || "/avatar.svg"} className="w-8 h-8 rounded-full border" />
-                <div>
-                    <div className="font-semibold">{player.name || `Seat ${player.seat}`}</div>
-                    <div className="text-xs opacity-60">Wins: {player.roundWins}</div>
-                </div>
-            </div>
+    isActiveSeat: boolean;
+    isViewer: boolean;
+};
 
-            <div className={`flex-1 mx-4 ${isCurrent ? "" : "opacity-60"}`}>
-                <div
-                    className={`px-3 py-2 rounded border bg-white ${isCurrent ? "shadow pulse-border" : ""}`}
-                    style={{
-                        minHeight: "2.25rem",
-                    }}
-                >
-                    <span className="tracking-wide">{typed || player.lastWord || ""}</span>
+export default function PlayerTypingRow({ player, typed, isActiveSeat, isViewer }: PlayerTypingRowProps) {
+    const typedPreview = typed?.trim() || player.lastWord || "";
+    const disconnected = !player.isConnected;
+    const inactiveClass = player.isActive ? "" : "opacity-60";
+    const activeSeatClass = isActiveSeat ? "border-primary bg-body-tertiary" : "border-transparent";
+    return (
+        <li
+            className={`py-3 px-3 flex gap-3 items-center rounded border ${inactiveClass} ${activeSeatClass}`}
+            style={isViewer ? { boxShadow: "0 0 0 2px rgba(13,110,253,.3)" } : undefined}
+        >
+            <img src={player.iconUrl || "/avatar.svg"} className="w-10 h-10 rounded-full border" />
+
+            <div className="flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                    <div className="font-semibold leading-tight">
+                        {player.name || `Seat ${player.seat}`}
+                    </div>
+                    {isViewer && <span className="badge text-bg-info text-uppercase">You</span>}
+                    {disconnected && <DisconnectPill />}
+                </div>
+                <div className="text-xs opacity-70">Seat {player.seat} · Wins: {player.roundWins}</div>
+                <div className="mt-2 font-mono text-sm tracking-wide" aria-live={isActiveSeat ? "polite" : "off"}>
+                    {typedPreview ? (
+                        <span className="uppercase">{typedPreview}</span>
+                    ) : (
+                        <span className="opacity-60">Waiting…</span>
+                    )}
                 </div>
             </div>
 
             <span className={`badge ${player.isActive ? "text-bg-success" : "text-bg-secondary"}`}>
-                {isCurrent ? "Typing…" : player.isActive ? "In" : "Out"}
+                {isActiveSeat ? "Your turn" : player.isActive ? "In" : "Out"}
             </span>
         </li>
+    );
+}
+
+function DisconnectPill() {
+    return (
+        <span className="badge text-bg-danger d-inline-flex align-items-center gap-1" title="Disconnected">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12h14" />
+                <path d="M12 5v14" />
+            </svg>
+            Offline
+        </span>
     );
 }

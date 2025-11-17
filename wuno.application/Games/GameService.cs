@@ -1,6 +1,7 @@
 ﻿using Azure.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.IdentityModel.Tokens;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -280,17 +281,17 @@ namespace Wuno.Application.Games
         {
             var now = DateTime.UtcNow;
 
-            // Load minimal state first
-            var turnDto = await _db.Turns
-                .Where(t => t.Id == turnId && t.GameId == gameId)
-                .Select(t => new { t.Id, t.GameId, t.RoundId, t.Seat, t.StartedAt, t.DurationSec, t.EndedAt })
-                .FirstOrDefaultAsync(ct);
+            var curTurn = await _db.Turns
+                 .Where(t => t.Id == turnId && t.GameId == gameId)
+                 .AsNoTracking()
+                 .FirstOrDefaultAsync(ct);
 
-            if (turnDto is null) return new(false, "Not found");
-            if (turnDto.RoundId != roundId) return new(false, "Mismatched round/turn");
-            if (turnDto.Seat != req.Seat) return new(false, "Not your turn");
 
-            if ((now - turnDto.StartedAt).TotalSeconds >= turnDto.DurationSec)
+            if (curTurn is null) return new(false, "Not found");
+            if (curTurn.RoundId != roundId) return new(false, "Mismatched round/turn");
+            if (curTurn.Seat != req.Seat) return new(false, "Not your turn");
+
+            if ((now - curTurn.StartedAt).TotalSeconds >= curTurn.DurationSec)
             {
                 return new(false, "Timeout");
             }
@@ -298,6 +299,18 @@ namespace Wuno.Application.Games
             // validate request word
             var w = req.Word ?? "";
             if (!_wl.IsWord(w)) return new(false, "Not a valid word");
+            if (w.Length < curTurn.MinLen) return new(false, $"Word too short (min {curTurn.MinLen})");
+            if (!curTurn.FreeStart 
+                && !curTurn.LastWord.IsNullOrEmpty()
+                && w.First() == curTurn.LastWord.Last())
+            {
+                return new(false, $"Word must start with '{curTurn.LastWord!.Last()}'");
+            }
+            //hasnt been played this round
+            var playedThisRound = await _db.Turns
+                .Where(t => t.RoundId == roundId && t.Word == w)
+                .AnyAsync(ct);
+            if (playedThisRound) return new(false, "Word already played this round");
 
             // atomically accept the word (gate)
             var accepted = await _db.Turns

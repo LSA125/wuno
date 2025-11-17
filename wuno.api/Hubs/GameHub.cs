@@ -93,6 +93,7 @@ namespace Wuno.Api.Hubs
                     TurnState turn = await _svc.StartMatchAsync(gameId, ct);
                     var state = await _svc.GetGameStateAsync(gameId, ct);
                     await _hub.Clients.Group($"game:{gameId}").SendAsync("MatchStarted", state, ct);
+                    await BroadcastTurnStartedAsync(gameId, state.CurrentTurn, ct);
                     _turnTimer.Schedule(gameId, turn.TurnId, turn.DueAt, BroadcastAfterTimeout);
                 }
                 catch (Exception ex)
@@ -137,17 +138,17 @@ namespace Wuno.Api.Hubs
                 var turn = await _svc.StartRoundAsync(gameId, ct);
                 var afterNewRound = await _svc.GetGameStateAsync(gameId, ct);
                 await _hub.Clients.Group($"game:{gameId}").SendAsync("NewRoundStarted", afterNewRound, ct);
-                _turnTimer.Schedule(gameId, turn.TurnId, turn.DueAt, BroadcastAfterTimeout);
             }
 
             var state = await _svc.GetGameStateAsync(gameId, ct);
+            await BroadcastTurnStartedAsync(gameId, state.CurrentTurn, ct);
+
             await _hub.Clients.Group($"game:{gameId}").SendAsync("GameUpdated", state, ct);
         }
         public async Task WordChanged(string word)
         {
             var ct = Context.ConnectionAborted;
             var ps = RequireSession();
-            //make sure its the users turn
             if (ps.Seat != await _svc.GetCurrentSeatAsync(ps.GameId, ct))
             {
                 return;
@@ -163,6 +164,12 @@ namespace Wuno.Api.Hubs
         {
             var state = await _svc.GetGameStateAsync(gameId, CancellationToken.None);
             await _hub.Clients.Group($"game:{gameId}").SendAsync("GameUpdated", state);
+            await BroadcastTurnStartedAsync(gameId, state.CurrentTurn);
+        }
+        private Task BroadcastTurnStartedAsync(Guid gameId, TurnState? turn, CancellationToken ct = default)
+        {
+            if (turn is null) return Task.CompletedTask;
+            return _hub.Clients.Group($"game:{gameId}").SendAsync("TurnStarted", turn, ct);
         }
     }
 }
