@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using wuno.domain.Rules;
 using Wuno.Application.Games.Inheritance;
 
-namespace Wuno.Application.Games
+namespace Wuno.Application.Games.Implementation
 {
     public sealed class WordList : IWordList
     {

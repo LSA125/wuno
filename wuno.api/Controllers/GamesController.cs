@@ -3,8 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using wuno.domain;
 using Wuno.Application;
-using Wuno.Application.Games;
 using Wuno.Application.Games.Inheritance;
+using Wuno.Application.Games.Util;
 using Wuno.Application.Users;
 namespace Wuno.Api.Controllers
 {

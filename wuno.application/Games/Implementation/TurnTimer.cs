@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Wuno.Application.Games.Inheritance;
 
-namespace Wuno.Application.Games
+namespace Wuno.Application.Games.Implementation
 {
     public sealed class TurnTimer : ITurnTimer
     {
@@ -43,8 +43,10 @@ namespace Wuno.Application.Games
                 using var scope = _sf.CreateScope();
                 var svc = scope.ServiceProvider.GetRequiredService<IGameService>();
 
-                if (await svc.TimeoutAndAdvanceAsync(gameId, turnId, CancellationToken.None))
+                if (await svc.TimeoutAsync(gameId, turnId, CancellationToken.None))
+                {
                     await Broadcast(gameId, turnId);
+                }
             }
             catch (TaskCanceledException) { }
             finally

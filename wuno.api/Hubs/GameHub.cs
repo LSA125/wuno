@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
-using Wuno.Application.Games;
 using Wuno.Application.Games.Inheritance;
+using Wuno.Application.Games.Util;
 
 namespace Wuno.Api.Hubs
 {
@@ -107,11 +107,15 @@ namespace Wuno.Api.Hubs
                 await _hub.Clients.Group($"game:{gameId}").SendAsync("PlayersUpdated", players, ct);
             }
         }
+        private async Task AdvanceTurn(Guid gameId)
+        {
+
+        }
         public async Task SubmitWord(Guid gameId, Guid roundId, Guid turnId, string word)
         {
             var ct = Context.ConnectionAborted;
             var ps = RequireSession();
-            SubmitWordResponse res = await _svc.SubmitWordAsync(gameId, roundId, turnId, new SubmitWordRequest(ps.Seat, word), ct);
+            SubmitWordResponse res = await _svc.SubmitWordAsync(gameId, roundId, turnId, ps.PlayerId,ps.Seat, word, ct);
             if (!res.Ok)
             {
                 await Clients.Caller.SendAsync("WordRejected", res.Reason, ct);
@@ -153,7 +157,7 @@ namespace Wuno.Api.Hubs
             {
                 return;
             }
-            if (!_typingGate.tryAllow(Context.ConnectionId, TimeSpan.FromMilliseconds(100)))
+            if (!_typingGate.tryAllow(Context.ConnectionId, TimeSpan.FromMilliseconds(50)))
             {
                 return;
             }

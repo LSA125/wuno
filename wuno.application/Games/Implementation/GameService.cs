@@ -11,8 +11,10 @@ using wuno.domain;
 using wuno.domain.Rules;
 using wuno.infrastructure;
 using Wuno.Application.Games.Inheritance;
+using Wuno.Application.Games.Util;
+using Wuno.Domain.Rules;
 
-namespace Wuno.Application.Games
+namespace Wuno.Application.Games.Implementation
 {
     public sealed class GameService : IGameService
     {
@@ -54,13 +56,22 @@ namespace Wuno.Application.Games
             if (game is null) throw new Exception("Game not found");
             return game.Players.All(p => p.IsActive || !p.IsTaken) && game.Players.Count(p => p.IsActive) >= 2;
         }
+        private void ResetPlayers(List<Player> players)
+        {
+            foreach (var p in players)
+            {
+                p.IsActive = p.IsTaken;
+                p.LastWord = null;
+                p.TurnsPlayedThisRound = 0;
+            }
+        }
         public async Task<NewGameResponse> StartNewGameAsync(NewGameRequest req, CancellationToken ct)
         {
             var n = Math.Clamp(req.PlayerCount, Constants.MIN_PLAYERS, Constants.MAX_PLAYERS);
             var game = new Game
             {
                 TargetWins = Math.Clamp(req.TargetWins, Constants.MIN_TARGET_WINS, Constants.MAX_TARGET_WINS),
-                NextSeat = 1,
+                CurSeat = 1,
                 Status = GameStatus.WAITING,
             };
             // try generate unique code
@@ -70,7 +81,7 @@ namespace Wuno.Application.Games
             {
                 code = _cg.GenerateCode();
                 attempts++;
-            } while (await _db.Games.AnyAsync(g => g.Code == code, ct) && attempts < 100);
+            } while (await _db.Games.AnyAsync(g => g.Code == code && g.Status != GameStatus.FINISHED, ct) && attempts < 100);
             if (attempts >= 100) throw new Exception("Failed to generate unique game code");
             game.Code = code;
 
@@ -79,7 +90,7 @@ namespace Wuno.Application.Games
             _db.Games.Add(game);
             await _db.SaveChangesAsync(ct);
 
-            return new NewGameResponse(game.Code, 1, n, game.TargetWins);
+            return new NewGameResponse(game.Code, n, game.TargetWins);
         }
         public async Task<bool> MarkMatchAsStartedAsync(Guid gameId, CancellationToken ct)
         {
@@ -92,32 +103,29 @@ namespace Wuno.Application.Games
         public async Task<TurnState> StartMatchAsync(Guid gameId, CancellationToken ct)
         {
             var game = await _db.Games
-                .AsNoTracking()
+                .AsTracking()
                 .Include(g => g.Players)
                 .Include(g => g.Rounds)
                 .Include(g => g.Turns)
                 .FirstAsync(g => g.Id == gameId, ct);
-                
-            foreach (var p in game.Players)
-            {
-                if (p.IsTaken)
-                {
-                    p.IsActive = true;
-                }
-                p.LastWord = null;
-            }
+
+            ResetPlayers(game.Players);
 
             var round = new Round
             {
                 GameId = game.Id,
                 Index = game.Rounds.Count,
-                Active = true,
                 StartedAt = DateTime.UtcNow
             };
             game.Rounds.Add(round);
+            game.CurrentRound = round;
 
-            TurnState firstTurn = StartTurn(game, round, prevAcceptedLetter: null, ct);
-
+            Player? firstPlayer = FindNextValidPlayer(game.Players, game.CurSeat);
+            if(firstPlayer is null)
+            {
+                throw new Exception("No valid player on first round");
+            }
+            TurnState firstTurn = await AddNewTurnToGame(game, round, firstPlayer, ct);
             await _db.SaveChangesAsync(ct);
             return firstTurn;
         }
@@ -136,36 +144,42 @@ namespace Wuno.Application.Games
         public async Task<TurnState> StartRoundAsync(Guid gameId, CancellationToken ct)
         {
             Game game = await _db.Games
+              .Include(r => r.Rounds)
+              .Include(t => t.Turns)
+              .Include(g => g.CurrentTurn)
               .Include(g => g.Players)
-              .Include(g => g.Rounds)
               .FirstOrDefaultAsync(g => g.Id == gameId, ct)
               ?? throw new Exception("Game not found");
 
-            // reset players
-            foreach (var p in game.Players)
+            int startSeat = 1;
+            Guid? winnerId = game.Rounds
+                .OrderByDescending(r => r.Index)
+                .FirstOrDefault()?
+                .WinnerId;
+            if(winnerId is not null)
             {
-                if (p.IsTaken)
-                {
-                    p.IsActive = true;
-                }
-                p.LastWord = null;
+                startSeat = game.Players.Find(p => p.Id == winnerId)!.Seat;
             }
+            
+            ResetPlayers(game.Players);
             // new round
             var round = new Round
             {
                 GameId = game.Id,
                 Index = game.Rounds.Count,
-                Active = true,
                 StartedAt = DateTime.UtcNow
             };
             game.Rounds.Add(round);
-            // first turn
-            return StartTurn(game, round, prevAcceptedLetter: null, ct);
+            game.CurrentRound = round;
+            Player firstPlayer = FindNextValidPlayer(game.Players, startSeat - 1)!
+                ?? throw new Exception("No valid player to start round");
+            TurnState newTurn = await AddNewTurnToGame(game, round, firstPlayer, ct);
+            await _db.SaveChangesAsync(ct);
+            return newTurn;
         }
         public async Task<bool> IsRoundEndAsync(Guid gameId, CancellationToken ct)
         {
             return await _db.Games
-                .Include(g => g.Players)
                 .AnyAsync(g => g.Id == gameId && g.Players.Count(p => p.IsActive) <= 1, ct);
         }
         public async Task EndRoundAsync(Guid gameId, Guid roundId, CancellationToken ct)
@@ -176,13 +190,20 @@ namespace Wuno.Application.Games
               .FirstOrDefaultAsync(r => r.Id == roundId && r.GameId == gameId, ct)
               ?? throw new Exception("Round not found");
             //select all active players
-            List<Player> activePlayers = round.Game.Players.Where(p => p.IsActive).ToList();
-            round.Active = false;
+            var activePlayers = round.Game.Players.Where(p => p.IsActive).ToList();
+            if (activePlayers.Count != 1)
+            {
+                throw new InvalidOperationException(
+                    $"Expected exactly one active player as winner, found {activePlayers.Count}.");
+            }
+
+            var winner = activePlayers[0];
             round.EndedAt = DateTime.UtcNow;
-            round.WinnerId = activePlayers.Single().Id;
-            var winner = round.Game.Players.Single(p => p.Id == round.WinnerId);
+            round.WinnerId = winner.Id;
             winner.RoundWins += 1;
+
             await _db.SaveChangesAsync(ct);
+
         }
         public async Task<List<PlayerState>> GetPlayersAsync(Guid gameId, CancellationToken ct)
         {
@@ -193,61 +214,41 @@ namespace Wuno.Application.Games
               .Select(p => new PlayerState(p.Id, p.Seat, p.IsActive, p.IsConnected, p.Name, p.IconUrl, p.RoundWins, p.LastWord))
               .ToListAsync(ct);
         }
-        public async Task<RoundState> GetRoundAsync(Guid roundId, CancellationToken ct)
+        public async Task<List<EffectState>> GetEffectStatesAsync(Guid roundId, int seat, int turnCountForSeat, CancellationToken ct)
         {
-            var round = await _db.Rounds
-              .AsNoTracking()
-              .FirstOrDefaultAsync(r => r.Id == roundId, ct);
-            if (round is null) throw new Exception("Round not found");
-            return new RoundState(round.Id, round.Index, round.Active, round.WinnerId, round.StartedAt, round.EndedAt);
-        }
-        public async Task<TurnState> GetTurnAsync(Guid turnId, CancellationToken ct)
-        {
-            var turn = await _db.Turns
-              .AsNoTracking()
-              .FirstOrDefaultAsync(t => t.Id == turnId, ct);
-            if (turn is null) throw new Exception("Turn not found");
-            return new TurnState(turn.Id, turn.Index, turn.Seat, turn.StartedAt, 
-                                    turn.DurationSec, turn.DueAt, turn.MinLen, turn.FreeStart);
-        }
-        public async Task<(Guid turnId, int seat, DateTime dueAt)> GetCurrentTurnInfoAsync(Guid gameId, CancellationToken ct)
-        {
-            var dto = await _db.Turns
+            return await _db.Effects
                 .AsNoTracking()
-                .Where(t => t.GameId == gameId && t.EndedAt == null)
-                .OrderByDescending(t => t.Index)
-                .Select(t => new { t.Id, t.Seat, t.DueAt }) // SQL-friendly
-                .FirstOrDefaultAsync(ct) ?? throw new Exception("No active turn found");
-
-            return new(dto.Id, dto.Seat, dto.DueAt);
+                .Where(e => e.RoundId == roundId && e.TargetSeat == seat && e.AppliesOnTurn == turnCountForSeat)
+                .Select(e => new EffectState(e.Type, e.Value))
+                .ToListAsync(ct);
         }
         public async Task<GameState> GetGameStateAsync(Guid gameId, CancellationToken ct)
         {
-            return await _db.Games
+            var game = await _db.Games
               .AsNoTracking()
-              .Where(g => g.Id == gameId)
-              .Select(g => new GameState(
-                  g.Id,
-                  g.Status,
-                  g.NextSeat,
-                  g.Direction,
-                  g.TargetWins,
-                  g.Players
-                    .Where(p => p.IsTaken)
-                    .OrderBy(p => p.Seat)
-                    .Select(p => new PlayerState(p.Id, p.Seat, p.IsActive, p.IsConnected, p.Name, p.IconUrl, p.RoundWins, p.LastWord))
-                    .ToList(),
-                  g.Rounds
-                    .OrderByDescending(r => r.Index)
-                    .Select(r => new RoundState(r.Id, r.Index, r.Active, r.WinnerId, r.StartedAt, r.EndedAt))
-                    .FirstOrDefault()!,
-                  g.Turns
-                    .Where(t => t.EndedAt == null)
-                    .OrderByDescending(t => t.Index)
-                    .Select(t => new TurnState(t.Id, t.Index, t.Seat, t.StartedAt, t.DurationSec, t.DueAt, t.MinLen, t.FreeStart))
-                    .FirstOrDefault()!
-              ))
-              .FirstOrDefaultAsync(ct) ?? throw new Exception("Game not found");
+              .Include(g => g.Players)
+              .Include(g => g.CurrentTurn)
+              .Include(g => g.CurrentRound)
+              .FirstOrDefaultAsync(g => g.Id == gameId, ct);
+            if (game is null) throw new Exception("Game not found");
+
+            if (game.CurrentRound is null) throw new Exception("No rounds found for game");
+            if (game.CurrentTurn is null) throw new Exception("No active turn found for game");
+            List<PlayerState> players = game.Players
+                .Where(p => p.IsTaken)
+                .Select(p => State.PlayerToState(p))
+                .ToList();
+            Player currentPlayer = game.Players
+                .FirstOrDefault(p => p.Seat == game.CurrentTurn!.Seat)
+                ?? throw new Exception("Current turn player not found");
+            List<EffectState> effects = await 
+                GetEffectStatesAsync(game.CurrentRound.Id, 
+                game.CurrentTurn.Seat, 
+                currentPlayer.TurnsPlayedThisRound, ct);
+            return State.GameToState(game, 
+                players, 
+                State.RoundToState(game.CurrentRound), 
+                State.TurnToState(game.CurrentTurn,effects));
         }
         public async Task<GameCodeResponse> GetUserActiveGameCodeAsync(Guid userId, CancellationToken ct)
         {
@@ -276,35 +277,37 @@ namespace Wuno.Application.Games
             if (seat == 0) throw new Exception("No active turn found");
             return seat;
         }
-
-        public async Task<SubmitWordResponse> SubmitWordAsync(Guid gameId, Guid roundId, Guid turnId, SubmitWordRequest req, CancellationToken ct)
+        private sealed record TurnValidationInfo(string? LastWord, Turn? curTurn);
+        public async Task<SubmitWordResponse> SubmitWordAsync(Guid gameId, Guid roundId, Guid turnId, Guid playerId, int seat, string word, CancellationToken ct)
         {
             var now = DateTime.UtcNow;
 
-            var curTurn = await _db.Turns
-                 .Where(t => t.Id == turnId && t.GameId == gameId)
-                 .AsNoTracking()
-                 .FirstOrDefaultAsync(ct);
+            TurnValidationInfo? res = await _db.Games
+                .Where(g => g.Id == gameId)
+                .Include(g => g.CurrentTurn)
+                .Select(g => new TurnValidationInfo(g.LastWord, g.CurrentTurn ))
+                .FirstOrDefaultAsync(ct);
 
 
-            if (curTurn is null) return new(false, "Not found");
-            if (curTurn.RoundId != roundId) return new(false, "Mismatched round/turn");
-            if (curTurn.Seat != req.Seat) return new(false, "Not your turn");
+            if (res is null || res.curTurn is null) return new(false, "Not found");
+            if (res.curTurn.Seat != seat) return new(false, "Not your turn");
 
-            if ((now - curTurn.StartedAt).TotalSeconds >= curTurn.DurationSec)
+            if (now > res.curTurn.DueAt)
             {
+                _tt.Cancel(turnId);
+                await TimeoutAsync(gameId, turnId, ct);
                 return new(false, "Timeout");
             }
 
             // validate request word
-            var w = req.Word ?? "";
+            var w = word;
             if (!_wl.IsWord(w)) return new(false, "Not a valid word");
-            if (w.Length < curTurn.MinLen) return new(false, $"Word too short (min {curTurn.MinLen})");
-            if (!curTurn.FreeStart 
-                && !curTurn.LastWord.IsNullOrEmpty()
-                && w.First() == curTurn.LastWord.Last())
+            if (w.Length < res.curTurn.MinLen) return new(false, $"Word too short (min {res.curTurn.MinLen})");
+            if (!res.curTurn.FreeStart 
+                && !res.LastWord.IsNullOrEmpty()
+                && w.First() == res.LastWord!.Last())
             {
-                return new(false, $"Word must start with '{curTurn.LastWord!.Last()}'");
+                return new(false, $"Word must start with '{res.LastWord!.Last()}'");
             }
             //hasnt been played this round
             var playedThisRound = await _db.Turns
@@ -317,115 +320,115 @@ namespace Wuno.Application.Games
                 .Where(t => t.Id == turnId && t.EndedAt == null)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(t => t.Word, _ => w)
-                    .SetProperty(t => t.WordLen, _ => w.Length)
                     .SetProperty(t => t.EndedAt, _ => now)
                     .SetProperty(t => t.EndReason, _ => TurnEndReason.END), ct);
 
             if (accepted == 0) return new(false, "Turn already processed");
 
-            // advance in a transaction
-            using (var tx = await _db.Database.BeginTransactionAsync(ct))
-            {
-                var game = await _db.Games
-                    .AsTracking()
-                    .Include(g => g.Players)
-                    .FirstAsync(g => g.Id == gameId, ct);
-                var round = await _db.Rounds.SingleAsync(r => r.Id == roundId && r.GameId == gameId, ct);
-                var curTurn = await _db.Turns.SingleAsync(t => t.Id == turnId && t.GameId == gameId, ct);
-                var lastTurnWord = await _db.Turns
-                    .Where(t => t.GameId == gameId && t.RoundId == roundId && t.Index < curTurn.Index && t.Word != null)
-                    .OrderByDescending(t => t.Index)
-                    .Select(t => t.Word!)
-                    .FirstOrDefaultAsync(ct) ?? "";
-                var me = game.Players.Single(p => p.Seat == req.Seat);
-                me.LastWord = w;
-
-                // compute effects & create next turn deterministically
-                EffectRng rng = EffectRng.FromInputs(game.Id, round.Index, curTurn.Index, w, lastTurnWord); 
-                var effects = EffectsLogic.SpecialsFromWord(w, lastTurnWord, rng);
-                foreach (var (type, val, target) in effects)
-                {
-                    int targetSeat = target == EffectTarget.SELF ? me.Seat : NextSeat(game.Players.Count, me.Seat, game.Direction);
-                    var targetPlayer = game.Players.Single(p => p.Seat == targetSeat);
-                    int personalIndex = game.Turns.Count(t => t.Seat == targetSeat) + 1;
-                    var effect = new Effect
-                    {
-                        GameId = game.Id,
-                        RoundId = round.Id,
-                        PlayerId = targetPlayer.Id,
-                        AppliesOn = personalIndex,
-                        Type = type,
-                        Value = val
-                    };
-                    game.Effects.Add(effect);
-                }
-                var nextLetter = EffectsLogic.NextStartLetterFrom(w);
-                StartTurn(game, round, nextLetter, ct);
-
-                await _db.SaveChangesAsync(ct);
-                await tx.CommitAsync(ct);
-            }
             return new(true, null);
         }
 
-        static int NextSeat(int n, int seat, int dir) => ((seat - 1 + dir + n) % n) + 1;
-        static int PrevSeat(int n, int seat, int dir) => ((seat - 1 - dir + n) % n) + 1;
-        public TurnState StartTurn(Game game, Round round, char? prevAcceptedLetter, CancellationToken ct)
+        static int NextSeat(int n, int seat, int dir) => (seat - 1 + dir + n) % n + 1;
+        static int PrevSeat(int n, int seat, int dir) => (seat - 1 - dir + n) % n + 1;
+        public async Task<TurnState> StartTurnAsync(Guid gameId, CancellationToken ct)
         {
-            var prev = game.Turns.OrderByDescending(t => t.Index).FirstOrDefault(); // latest
+            Game game = await _db.Games
+              .Include(g => g.Players)
+              .Include(g => g.CurrentRound)
+              .Include(g => g.Turns)
+              .FirstOrDefaultAsync(g => g.Id == gameId, ct)
+              ?? throw new Exception("Game not found");
+            Player? nextPlayer = FindNextValidPlayer(game.Players, game.CurSeat);
+            TurnState newTurn = await AddNewTurnToGame(game, game.CurrentRound!, nextPlayer!, ct);
+            await _db.SaveChangesAsync(ct);
+            return newTurn;
+        }
+        private async Task<TurnState> AddNewTurnToGame(Game game, Round round, Player nextPlayer, CancellationToken ct)
+        {
+            var prev = game.CurrentTurn;
+            Turn newTurn;
+            List<EffectState> effects = [];
             if (prev is null)
             {
-                var turn = new Turn
+                newTurn = new Turn
                 {
                     GameId = game.Id,
                     RoundId = round.Id,
                     Index = 0,
-                    Seat = game.NextSeat,
-                    StartLetter = null,
+                    Seat = nextPlayer.Seat,
                     FreeStart = true,
                     MinLen = Constants.DEFAULT_START_LEN,
-                    DurationSec = Constants.DEFAULT_TURN_DUR_SEC,
                     StartedAt = DateTime.UtcNow,
                     DueAt = DateTime.UtcNow.AddSeconds(Constants.DEFAULT_TURN_DUR_SEC)
                 };
-                game.Turns.Add(turn);
             }
             else
             {
-                var seat = NextSeat(game.Players.Count, prev.Seat, game.Direction);
-                var player = game.Players.Single(p => p.Seat == seat);
+                var personalIndex = nextPlayer.TurnsPlayedThisRound;
+                effects = await GetEffectStatesAsync(round.Id, nextPlayer.Seat, personalIndex, ct);
 
-                // compute personal turn index for seat
-                var personalIndex = game.Turns.Count(t => t.Seat == seat) + 1;
-                var effects = game.Effects.Where(e => e.PlayerId == player.Id && e.AppliesOn == personalIndex)
-                                          .Select(e => new EffectState(e.Type, e.Value)).ToList();
-                var prevWord = player.LastWord;
+                //get the restraints off of the last word, player turn #, and their own last word 
+                var baseC = Constraints.Base(prev.Word?.LastOrDefault(), personalIndex, nextPlayer.LastWord);
+                Constraints applied = EffectsLogic.Apply(baseC, effects);
 
-                var baseC = Constraints.Base(prevAcceptedLetter ?? prev.StartLetter, personalIndex, prevWord);
-                var applied = EffectsLogic.Apply(baseC, effects);
-
-                var minLen = Math.Max(applied.MinLen, player.LastWord?.Length ?? 0);
-
-                var newTurn = new Turn
+                newTurn = new Turn
                 {
                     GameId = game.Id,
                     RoundId = round.Id,
                     Index = game.Turns.Count,
-                    Seat = seat,
-                    StartLetter = applied.FreeStart ? null : applied.StartLetter,
+                    Seat = nextPlayer.Seat,
                     FreeStart = applied.FreeStart,
-                    MinLen = minLen,
-                    DurationSec = applied.DurationSec,
+                    MinLen = applied.MinLen,
                     StartedAt = DateTime.UtcNow,
                     DueAt = DateTime.UtcNow.AddSeconds(applied.DurationSec)
                 };
-                game.Turns.Add(newTurn); // we keep latest at [0] in memory; EF will save anyway
-                game.NextSeat = seat;
             }
-            Turn turn1 = game.Turns.OrderByDescending(t => t.Index).FirstOrDefault() ?? throw new Exception("Failed to create new turn");
-            return new TurnState(turn1.Id, turn1.Index, turn1.Seat, turn1.StartedAt,
-                                    turn1.DurationSec, turn1.DueAt, turn1.MinLen, turn1.FreeStart);
+            _db.Turns.Add(newTurn);
+            game.CurSeat = nextPlayer.Seat;
+            game.CurrentTurn = newTurn;
+            return State.TurnToState(newTurn, effects);
         }
+        private Player? FindNextValidPlayer(IReadOnlyList<Player> players, int curSeat)
+        {
+            Player? candidate = null;
+            int candidateSeat = int.MaxValue;
+
+            if (players.Count == 0)
+                return null;
+
+            foreach (var p in players)
+            {
+                if (!p.IsTaken || !p.IsActive)
+                    continue;
+
+                if (p.Seat > curSeat && p.Seat < candidateSeat)
+                {
+                    candidateSeat = p.Seat;
+                    candidate = p;
+                }
+            }
+
+            if (candidate != null)
+                return candidate;
+
+            candidate = null;
+            candidateSeat = int.MaxValue;
+
+            foreach (var p in players)
+            {
+                if (!p.IsTaken || !p.IsActive)
+                    continue;
+
+                if (p.Seat < candidateSeat)
+                {
+                    candidateSeat = p.Seat;
+                    candidate = p;
+                }
+            }
+
+            return candidate;
+        }
+
         async public Task<JoinGameResponse> JoinGameAsync(Guid gameId, Guid userId, CancellationToken ct)
         {
             var game = await _db.Games
@@ -484,34 +487,44 @@ namespace Wuno.Application.Games
             await _db.SaveChangesAsync(ct);
         }
         //Timeout and advance turn
-        public async Task<bool> TimeoutAndAdvanceAsync(Guid gameId, Guid turnId, CancellationToken ct)
+        public async Task<bool> TimeoutAsync(Guid gameId, Guid turnId, CancellationToken ct)
         {
-            var affected = await _db.Turns
-                .Where(t => t.Id == turnId && t.EndedAt == null)
-                .ExecuteUpdateAsync(s => s
-                    .SetProperty(t => t.EndedAt, _ => DateTime.UtcNow)
-                    .SetProperty(t => t.EndReason, _ => TurnEndReason.TIMEOUT), ct);
-
-            if (affected == 0) return false;
-
-            using var tx = await _db.Database.BeginTransactionAsync(ct);
-            var game = await _db.Games.AsTracking()
+            var game = await _db.Games
                 .Include(g => g.Players)
-                .Include(g => g.Rounds.OrderByDescending(r => r.Index))
-                .Include(g => g.Turns.OrderByDescending(t => t.Index))
-                .Include(g => g.Effects)
-                .FirstAsync(g => g.Id == gameId, ct);
+                .Include(g => g.CurrentTurn)
+                .FirstOrDefaultAsync(g => g.Id == gameId, ct)
+                ?? throw new Exception("Game not found");
 
-            var round = game.Rounds.First();
-            var turn = game.Turns.First(t => t.Id == turnId);
+            var currentTurn = game.CurrentTurn;
+            if (currentTurn is null || currentTurn.Id != turnId)
+            {
+                return false;
+            }
 
-            var player = game.Players.Single(p => p.Seat == turn.Seat);
+            if (currentTurn.EndedAt != null)
+            {
+                return false;
+            }
+
+            var player = game.Players.SingleOrDefault(p => p.Seat == currentTurn.Seat);
+            if (player is null)
+            {
+                throw new InvalidOperationException("Current turn player not found");
+            }
+
+            currentTurn.EndedAt = DateTime.UtcNow;
+            currentTurn.EndReason = TurnEndReason.TIMEOUT;
             player.IsActive = false;
 
-            StartTurn(game, round, prevAcceptedLetter: turn.Word?.LastOrDefault(), ct);
-            await _db.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
-            return true;
+            try
+            {
+                await _db.SaveChangesAsync(ct);
+                return true;
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return false;
+            }
         }
 
         public async Task ForceEndGame(Guid gameId, CancellationToken ct)

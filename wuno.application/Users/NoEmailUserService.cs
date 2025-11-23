@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Threading;
 using wuno.domain;
 using wuno.infrastructure;
-using Wuno.Application.Games;
+using Wuno.Application.Games.Util;
 using Wuno.Domain.Rules; // if you already have Email.NormalizeEmail
 
 namespace Wuno.Application.Users
