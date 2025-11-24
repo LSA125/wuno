@@ -1,14 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Wuno.Application.Games.Util;
 
 namespace Wuno.Application.Games.Inheritance
 {
     public interface ITurnTimer
     {
-        public bool Schedule(Guid gameId, Guid turnId, DateTime dueAtUTC, Func<Guid, Guid, Task> Broadcast);
+        public bool Schedule(Guid gameId, Guid turnId, DateTime dueAtUTC, Func<GameState, Task> Broadcast);
         public void Cancel(Guid turnId);
     }
 }

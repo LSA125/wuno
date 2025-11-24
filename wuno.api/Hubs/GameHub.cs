@@ -92,8 +92,7 @@ namespace Wuno.Api.Hubs
                     await Task.Delay(timer, ct);
                     TurnState turn = await _svc.StartMatchAsync(gameId, ct);
                     var state = await _svc.GetGameStateAsync(gameId, ct);
-                    await _hub.Clients.Group($"game:{gameId}").SendAsync("MatchStarted", state, ct);
-                    await BroadcastTurnStartedAsync(gameId, state.CurrentTurn, ct);
+                    await _hub.Clients.Group($"game:{gameId}").SendAsync("GameUpdated", state, ct);
                     _turnTimer.Schedule(gameId, turn.TurnId, turn.DueAt, BroadcastAfterTimeout);
                 }
                 catch (Exception ex)
@@ -107,47 +106,20 @@ namespace Wuno.Api.Hubs
                 await _hub.Clients.Group($"game:{gameId}").SendAsync("PlayersUpdated", players, ct);
             }
         }
-        private async Task AdvanceTurn(Guid gameId)
-        {
-
-        }
         public async Task SubmitWord(Guid gameId, Guid roundId, Guid turnId, string word)
         {
             var ct = Context.ConnectionAborted;
             var ps = RequireSession();
-            SubmitWordResponse res = await _svc.SubmitWordAsync(gameId, roundId, turnId, ps.PlayerId,ps.Seat, word, ct);
-            if (!res.Ok)
+
+            ProcessTurnOutcome outcome = await _svc.ProcessTurnAsync(gameId, roundId, turnId, ps.PlayerId, ps.Seat, word, ct);
+            if (!outcome.Ok)
             {
-                await Clients.Caller.SendAsync("WordRejected", res.Reason, ct);
+                await Clients.Caller.SendAsync("WordRejected", outcome.Reason, ct);
                 return;
             }
-
             _turnTimer.Cancel(turnId);
-
-            if (await _svc.IsRoundEndAsync(gameId, ct))
-            {
-                await _svc.EndRoundAsync(gameId, roundId, ct);
-                var afterRound = await _svc.GetGameStateAsync(gameId, ct);
-                await _hub.Clients.Group($"game:{gameId}").SendAsync("RoundEnded", afterRound, ct);
-
-                await Task.Delay(3000, ct);
-                if (await _svc.IsMatchEndAsync(gameId, ct))
-                {
-                    await _svc.EndMatchAsync(gameId, ct);
-                    var ended = await _svc.GetGameStateAsync(gameId, ct);
-                    await _hub.Clients.Group($"game:{gameId}").SendAsync("MatchEnded", ended, ct);
-                    return;
-                }
-
-                var turn = await _svc.StartRoundAsync(gameId, ct);
-                var afterNewRound = await _svc.GetGameStateAsync(gameId, ct);
-                await _hub.Clients.Group($"game:{gameId}").SendAsync("NewRoundStarted", afterNewRound, ct);
-            }
-
-            var state = await _svc.GetGameStateAsync(gameId, ct);
-            await BroadcastTurnStartedAsync(gameId, state.CurrentTurn, ct);
-
-            await _hub.Clients.Group($"game:{gameId}").SendAsync("GameUpdated", state, ct);
+            _turnTimer.Schedule(gameId, outcome.State!.CurrentTurn.TurnId, outcome.State.CurrentTurn.DueAt, BroadcastAfterTimeout);
+            await _hub.Clients.Group($"game:{gameId}").SendAsync("GameUpdated", outcome.State, ct);
         }
         public async Task WordChanged(string word)
         {
@@ -164,16 +136,10 @@ namespace Wuno.Api.Hubs
             await Clients.OthersInGroup($"game:{ps.GameId}").SendAsync("WordChanged", word, ct);
         }
 
-        private async Task BroadcastAfterTimeout(Guid gameId, Guid turnId)
+        private async Task BroadcastAfterTimeout(GameState state)
         {
-            var state = await _svc.GetGameStateAsync(gameId, CancellationToken.None);
-            await _hub.Clients.Group($"game:{gameId}").SendAsync("GameUpdated", state);
-            await BroadcastTurnStartedAsync(gameId, state.CurrentTurn);
-        }
-        private Task BroadcastTurnStartedAsync(Guid gameId, TurnState? turn, CancellationToken ct = default)
-        {
-            if (turn is null) return Task.CompletedTask;
-            return _hub.Clients.Group($"game:{gameId}").SendAsync("TurnStarted", turn, ct);
+            await _hub.Clients.Group($"game:{state.GameId}").SendAsync("GameUpdated", state);
+            _turnTimer.Schedule(state.GameId, state.CurrentTurn.TurnId, state.CurrentTurn.DueAt, BroadcastAfterTimeout);
         }
     }
 }

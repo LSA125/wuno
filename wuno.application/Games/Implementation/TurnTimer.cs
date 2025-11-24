@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Wuno.Application.Games.Inheritance;
+using Wuno.Application.Games.Util;
 
 namespace Wuno.Application.Games.Implementation
 {
@@ -17,7 +18,7 @@ namespace Wuno.Application.Games.Implementation
         {
             _sf = sf;
         }
-        public bool Schedule(Guid gameId, Guid turnId, DateTime dueAtUTC, Func<Guid, Guid, Task> Broadcast)
+        public bool Schedule(Guid gameId, Guid turnId, DateTime dueAtUTC, Func<GameState, Task> Broadcast)
         {
             var delay = dueAtUTC - DateTime.UtcNow;
             if(delay < TimeSpan.Zero) delay = TimeSpan.Zero;
@@ -32,7 +33,7 @@ namespace Wuno.Application.Games.Implementation
             return true;
         }
 
-        private async Task RunTimerAsync(Guid gameId, Guid turnId, TimeSpan delay, Func<Guid, Guid, Task> Broadcast, CancellationTokenSource cts)
+        private async Task RunTimerAsync(Guid gameId, Guid turnId, TimeSpan delay, Func<GameState, Task> Broadcast, CancellationTokenSource cts)
         {
             try
             {
@@ -42,10 +43,10 @@ namespace Wuno.Application.Games.Implementation
 
                 using var scope = _sf.CreateScope();
                 var svc = scope.ServiceProvider.GetRequiredService<IGameService>();
-
-                if (await svc.TimeoutAsync(gameId, turnId, CancellationToken.None))
+                GameState? state = await svc.TimeoutAndAdvanceAsync(gameId, turnId, CancellationToken.None);
+                if (state is not null)
                 {
-                    await Broadcast(gameId, turnId);
+                    await Broadcast(state);
                 }
             }
             catch (TaskCanceledException) { }
