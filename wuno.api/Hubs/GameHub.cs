@@ -139,7 +139,10 @@ namespace Wuno.Api.Hubs
         private async Task BroadcastAfterTimeout(GameState state)
         {
             await _hub.Clients.Group($"game:{state.GameId}").SendAsync("GameUpdated", state);
-            _turnTimer.Schedule(state.GameId, state.CurrentTurn.TurnId, state.CurrentTurn.DueAt, BroadcastAfterTimeout);
+            if (state.Status != wuno.domain.GameStatus.FINISHED)
+            {
+                _turnTimer.Schedule(state.GameId, state.CurrentTurn.TurnId,  state.CurrentTurn.DueAt, BroadcastAfterTimeout);
+            }
         }
     }
 }

@@ -457,7 +457,7 @@ namespace Wuno.Application.Games.Implementation
             inactive.IconUrl = user.IconUrl;
             user.ActivePlayer = inactive;
             await _db.SaveChangesAsync(ct);
-            GameState? state = await GetGameStateAsync(gameId, ct) as GameState;
+            GameState? state = await GetGameStateAsync(gameId, ct);
             if (state is null) throw new Exception("Failed to get game state after joining");
             return new JoinGameResponse(inactive.Id, state);
         }
@@ -484,9 +484,115 @@ namespace Wuno.Application.Games.Implementation
         }
         public async Task<GameState?> TimeoutAndAdvanceAsync(Guid gameId, Guid turnId, CancellationToken ct)
         {
-            //todo
-            await Task.CompletedTask;
-            return null;
+            var now = DateTime.UtcNow;
+            await using IDbContextTransaction tx = await _db.Database.BeginTransactionAsync(ct);
+
+            Game? game = await _db.Games
+                .AsSplitQuery()
+                .Include(g => g.Players)
+                .Include(g => g.Rounds)
+                .Include(g => g.Turns)
+                .Include(g => g.Effects)
+                .Include(g => g.CurrentRound)
+                .Include(g => g.CurrentTurn)
+                .FirstOrDefaultAsync(g => g.Id == gameId, ct);
+
+            if (game is null || game.CurrentTurn is null || game.CurrentRound is null || game.CurrentTurn.Id != turnId)
+            {
+                return null;
+            }
+
+            Turn currentTurn = game.CurrentTurn;
+            if (currentTurn.EndedAt != null)
+            {
+                return null;
+            }
+
+            Player? player = game.Players.SingleOrDefault(p => p.Seat == currentTurn.Seat);
+            if (player is null)
+            {
+                return null;
+            }
+
+            int personalIndex = player.TurnsPlayedThisRound;
+            bool timedOut = now >= currentTurn.DueAt;
+
+            if (timedOut)
+            {
+                currentTurn.EndedAt = now;
+                currentTurn.EndReason = TurnEndReason.TIMEOUT;
+                player.IsActive = false;
+                player.TurnsPlayedThisRound += 1;
+            }
+            else
+            {
+                return null;
+            }
+
+            bool roundEnded = game.Players.Count(p => p.IsTaken && p.IsActive) <= 1;
+            bool matchEnded = false;
+
+            TurnState? currentTurnState = null;
+
+            if (roundEnded)
+            {
+                Round round = game.CurrentRound;
+                Player? winner = game.Players.FirstOrDefault(p => p.IsActive && p.IsTaken);
+                round.EndedAt = now;
+                round.WinnerId = winner?.Id;
+                if (winner is not null)
+                {
+                    winner.RoundWins += 1;
+                    matchEnded = winner.RoundWins >= game.TargetWins;
+                }
+
+                if (matchEnded)
+                {
+                    game.Status = GameStatus.FINISHED;
+                }
+                else
+                {
+                    ResetPlayers(game.Players);
+                    int startSeat = winner?.Seat ?? 1;
+                    Round nextRound = new()
+                    {
+                        GameId = game.Id,
+                        Index = game.Rounds.Count,
+                        StartedAt = now
+                    };
+
+                    game.Rounds.Add(nextRound);
+                    game.CurrentRound = nextRound;
+
+                    Player? firstPlayer = FindNextValidPlayer(game.Players, startSeat - 1)
+                        ?? throw new Exception("No valid player to start round");
+
+                    currentTurnState = CreateTurn(game, nextRound, firstPlayer, now);
+                }
+            }
+
+            if (!roundEnded)
+            {
+                Player? nextPlayer = FindNextValidPlayer(game.Players, game.CurSeat)
+                    ?? throw new Exception("No valid player to start turn");
+                currentTurnState = CreateTurn(game, game.CurrentRound!, nextPlayer, now);
+            }
+
+            if (currentTurnState is null)
+            {
+                currentTurnState = BuildTurnState(game, currentTurn, player, Math.Max(0, personalIndex));
+            }
+
+            await _db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+
+            List<PlayerState> players = [.. game.Players
+                .Where(p => p.IsTaken)
+                .Select(State.PlayerToState)];
+            RoundState roundState = State.RoundToState(game.CurrentRound!);
+            GameState state = State.GameToState(game, players, roundState, currentTurnState);
+
+            return state;
         }
 
         public async Task ForceEndGame(Guid gameId, CancellationToken ct)
