@@ -1,14 +1,9 @@
-﻿using FluentValidation.Internal;
-using System;
-using System.Collections.Frozen;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Collections.Frozen;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 using wuno.domain.Rules;
+using Wuno.Application.Games.Inheritance;
 
-namespace Wuno.Application.Games
+namespace Wuno.Application.Games.Implementation
 {
     public sealed class WordList : IWordList
     {

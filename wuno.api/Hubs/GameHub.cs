@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
-using wuno.infrastructure;
-using Wuno.Application.Games;
+using Wuno.Application.Games.Inheritance;
+using Wuno.Application.Games.Util;
 
 namespace Wuno.Api.Hubs
 {
@@ -86,12 +86,13 @@ namespace Wuno.Api.Hubs
             {
                 try
                 {
+                    if (!await _svc.MarkMatchAsStartedAsync(gameId, ct)) return;
                     var timer = 3000;
                     await _hub.Clients.Group($"game:{gameId}").SendAsync("AllPlayersReady", timer, ct);
                     await Task.Delay(timer, ct);
-                    var turn = await _svc.StartMatchAsync(gameId, ct);
+                    TurnState turn = await _svc.StartMatchAsync(gameId, ct);
                     var state = await _svc.GetGameStateAsync(gameId, ct);
-                    await _hub.Clients.Group($"game:{gameId}").SendAsync("MatchStarted", state, ct);
+                    await _hub.Clients.Group($"game:{gameId}").SendAsync("GameUpdated", state, ct);
                     _turnTimer.Schedule(gameId, turn.TurnId, turn.DueAt, BroadcastAfterTimeout);
                 }
                 catch (Exception ex)
@@ -109,59 +110,39 @@ namespace Wuno.Api.Hubs
         {
             var ct = Context.ConnectionAborted;
             var ps = RequireSession();
-            SubmitWordResponse res = await _svc.SubmitWordAsync(gameId, roundId, turnId, new SubmitWordRequest(ps.Seat, word), ct);
-            if (!res.Ok)
+
+            ProcessTurnOutcome outcome = await _svc.ProcessTurnAsync(gameId, roundId, turnId, ps.PlayerId, ps.Seat, word, ct);
+            if (!outcome.Ok)
             {
-                await Clients.Caller.SendAsync("WordRejected", res.Reason, ct);
+                await Clients.Caller.SendAsync("WordRejected", outcome.Reason, ct);
                 return;
             }
-
             _turnTimer.Cancel(turnId);
-
-            if (await _svc.IsRoundEndAsync(gameId, ct))
-            {
-                await _svc.EndRoundAsync(gameId, roundId, ct);
-                var afterRound = await _svc.GetGameStateAsync(gameId, ct);
-                await _hub.Clients.Group($"game:{gameId}").SendAsync("RoundEnded", afterRound, ct);
-
-                await Task.Delay(3000, ct);
-                if (await _svc.IsMatchEndAsync(gameId, ct))
-                {
-                    await _svc.EndMatchAsync(gameId, ct);
-                    var ended = await _svc.GetGameStateAsync(gameId, ct);
-                    await _hub.Clients.Group($"game:{gameId}").SendAsync("MatchEnded", ended, ct);
-                    return;
-                }
-
-                var turn = await _svc.StartRoundAsync(gameId, ct);
-                var afterNewRound = await _svc.GetGameStateAsync(gameId, ct);
-                await _hub.Clients.Group($"game:{gameId}").SendAsync("NewRoundStarted", afterNewRound, ct);
-                _turnTimer.Schedule(gameId, turn.TurnId, turn.DueAt, BroadcastAfterTimeout);
-            }
-
-            var state = await _svc.GetGameStateAsync(gameId, ct);
-            await _hub.Clients.Group($"game:{gameId}").SendAsync("GameUpdated", state, ct);
+            _turnTimer.Schedule(gameId, outcome.State!.CurrentTurn.TurnId, outcome.State.CurrentTurn.DueAt, BroadcastAfterTimeout);
+            await _hub.Clients.Group($"game:{gameId}").SendAsync("GameUpdated", outcome.State, ct);
         }
         public async Task WordChanged(string word)
         {
             var ct = Context.ConnectionAborted;
             var ps = RequireSession();
-            //make sure its the users turn
             if (ps.Seat != await _svc.GetCurrentSeatAsync(ps.GameId, ct))
             {
                 return;
             }
-            if (!_typingGate.tryAllow(Context.ConnectionId, TimeSpan.FromMilliseconds(100)))
+            if (!_typingGate.tryAllow(Context.ConnectionId, TimeSpan.FromMilliseconds(50)))
             {
                 return;
             }
             await Clients.OthersInGroup($"game:{ps.GameId}").SendAsync("WordChanged", word, ct);
         }
 
-        private async Task BroadcastAfterTimeout(Guid gameId, Guid turnId)
+        private async Task BroadcastAfterTimeout(GameState state)
         {
-            var state = await _svc.GetGameStateAsync(gameId, CancellationToken.None);
-            await _hub.Clients.Group($"game:{gameId}").SendAsync("GameUpdated", state);
+            await _hub.Clients.Group($"game:{state.GameId}").SendAsync("GameUpdated", state);
+            if (state.Status != wuno.domain.GameStatus.FINISHED)
+            {
+                _turnTimer.Schedule(state.GameId, state.CurrentTurn.TurnId,  state.CurrentTurn.DueAt, BroadcastAfterTimeout);
+            }
         }
     }
 }

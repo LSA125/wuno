@@ -1,16 +1,10 @@
-﻿// Controllers/GuestsController.cs
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
-using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.WebUtilities;
-using Wuno.Api.Middleware; // CookieName
-using Wuno.Infrastructure; // AppDbContext
-using wuno.domain;         // User entity
-using Wuno.Application.Users;
+using wuno.domain;
 using Wuno.Application.Games;
 using wuno.infrastructure;
 
@@ -20,12 +14,9 @@ using wuno.infrastructure;
 public sealed class GuestsController : ControllerBase
 {
     private readonly AppDbContext _db;
-    private readonly IDataProtector _prot;
-
     public GuestsController(AppDbContext db)
     {
         _db = db;
-        _prot = dp.CreateProtector("guest-id-v1");
     }
 
     public sealed record EnsureGuestReq(string Name, string? Email, string? IconUrl);
