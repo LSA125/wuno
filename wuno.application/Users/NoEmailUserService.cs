@@ -46,7 +46,7 @@ namespace Wuno.Application.Users
             }
             var nameTrimmed = name.Trim();
             var norm = Name.normalize(nameTrimmed);
-            var taken = await _db.Users.AnyAsync(u => u.IsRegistered && u.NameNormalized == norm, ct);
+            var taken = await _db.Users.AnyAsync(u => u.NameNormalized == norm, ct);
             if (taken)
             {
                 return new UserResponse(false, null, null, null, null, "Username is already in use.");
@@ -174,7 +174,8 @@ namespace Wuno.Application.Users
             // Update name if provided
             if (!string.IsNullOrWhiteSpace(newName))
             {
-                var nameInUse = await _db.Users.AnyAsync(u => u.Name == newName.Trim() && u.Id != user.Id, ct);
+                String norm = Name.normalize(newName.Trim());
+                var nameInUse = await _db.Users.AnyAsync(u => u.NameNormalized == norm, ct);
                 if (nameInUse)
                     return new UserResponse(false, null, null, null, null, "Username is already in use.");
                 user.Name = newName.Trim();
