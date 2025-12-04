@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <Folder Include="Background\" />
+    <Folder Include="Middleware\" />
   </ItemGroup>
 
 </Project>
