@@ -9,6 +9,7 @@ using wuno.infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Wuno.Application.Games;
 using Wuno.Domain.Rules;
+using Wuno.Application.Games.Util;
 
 [ApiController]
 [Route("api/auth")]
@@ -93,7 +94,7 @@ public sealed class AuthController : ControllerBase
         var norm = Name.normalize(username);
 
         var exists = await _db.Users.AnyAsync(
-            u => u.IsRegistered && u.NameNormalized == norm, ct);
+            u => u.NameNormalized == norm, ct);
         if (exists) return Conflict(new { msg = "Username is already taken." });
 
         User? user;

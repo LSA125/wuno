@@ -7,6 +7,7 @@ using System.Security.Claims;
 using wuno.domain;
 using Wuno.Application.Games;
 using wuno.infrastructure;
+using Wuno.Application.Games.Util;
 
 [ApiController]
 [Route("api/guests")]
