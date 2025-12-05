@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.8" />
+  </ItemGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\\wuno.infrastructure\\Wuno.Infrastructure.csproj" />
+    <ProjectReference Include="..\\wuno.application\\Wuno.Application.csproj" />
+    <ProjectReference Include="..\\wuno.domain\\Wuno.Domain.csproj" />
+  </ItemGroup>
+</Project>
