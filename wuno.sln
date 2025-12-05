@@ -46,6 +46,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wuno.Domain.Tests", "Wuno.D
 		{0A5C41E2-A23B-423E-AF14-75D0EAE34BE7} = {0A5C41E2-A23B-423E-AF14-75D0EAE34BE7}
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wuno.Testing", "Wuno.Testing\Wuno.Testing.csproj", "{71FFC7A1-357E-48E8-B28A-23A325564357}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -86,7 +88,11 @@ Global
 		{6D7EA8A1-14A8-4D57-86AA-9D82F16CE2DD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6D7EA8A1-14A8-4D57-86AA-9D82F16CE2DD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6D7EA8A1-14A8-4D57-86AA-9D82F16CE2DD}.Release|Any CPU.Build.0 = Release|Any CPU
-	EndGlobalSection
+					{71FFC7A1-357E-48E8-B28A-23A325564357}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+				{71FFC7A1-357E-48E8-B28A-23A325564357}.Debug|Any CPU.Build.0 = Debug|Any CPU
+				{71FFC7A1-357E-48E8-B28A-23A325564357}.Release|Any CPU.ActiveCfg = Release|Any CPU
+				{71FFC7A1-357E-48E8-B28A-23A325564357}.Release|Any CPU.Build.0 = Release|Any CPU
+EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
@@ -94,7 +100,8 @@ Global
 		{E5C60057-324C-4BAA-A1FB-A528E09AF72C} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{099C19B0-1FC6-44C4-BE4B-605EE85E3369} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{6D7EA8A1-14A8-4D57-86AA-9D82F16CE2DD} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
-	EndGlobalSection
+					{71FFC7A1-357E-48E8-B28A-23A325564357} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
+EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {13B36151-B990-44A6-AA43-DB91BD7ED324}
 	EndGlobalSection

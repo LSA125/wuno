@@ -20,4 +20,8 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Wuno.Testing\Wuno.Testing.csproj" />
+  </ItemGroup>
+
 </Project>
