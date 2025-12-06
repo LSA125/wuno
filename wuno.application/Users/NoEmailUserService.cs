@@ -98,7 +98,7 @@ namespace Wuno.Application.Users
             if (!string.IsNullOrWhiteSpace(emailNorm))
             {
                 // Enforce uniqueness when provided
-                var emailInUse = await _db.Users.AnyAsync(u => u.EmailNormalized == emailNorm && u.Id != user.Id, ct);
+                var emailInUse = await _db.Users.AnyAsync(u => u.EmailNormalized == emailNorm, ct);
                 if (emailInUse)
                     return new UserResponse(false, null, null, null, null, "Email is already in use.");
                 user.Email = email!.Trim();

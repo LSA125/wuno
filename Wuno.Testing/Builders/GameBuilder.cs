@@ -12,8 +12,6 @@ namespace Wuno.Testing.Builders
         private int _direction = 1;
         private DateTime _createdAt = DateTime.UtcNow;
         private string? _lastWord;
-        private int? _currentRoundIndex;
-        private int? _currentTurnIndex;
         private readonly List<PlayerBuilder> _players = new();
         private readonly List<Round> _rounds = new();
         private readonly List<TurnBuilder> _turns = new();
@@ -27,8 +25,6 @@ namespace Wuno.Testing.Builders
         public GameBuilder Direction(int direction) { _direction = direction; return this; }
         public GameBuilder Created(DateTime created) { _createdAt = created; return this; }
         public GameBuilder LastWord(string? word) { _lastWord = word; return this; }
-        public GameBuilder CurrentRoundIndex(int? index) { _currentRoundIndex = index; return this; }
-        public GameBuilder CurrentTurnIndex(int? index) { _currentTurnIndex = index; return this; }
         public GameBuilder AddPlayer(PlayerBuilder player) { _players.Add(player); return this; }
         public GameBuilder AddRound(Round round) { _rounds.Add(round); return this; }
         public GameBuilder AddRound(RoundBuilder round) { _rounds.Add(round.Build()); return this; }
@@ -73,16 +69,6 @@ namespace Wuno.Testing.Builders
                 effect.GameId = game.Id;
                 effect.Game = game;
                 game.Effects.Add(effect);
-            }
-
-            if (_currentRoundIndex.HasValue && _currentRoundIndex.Value < game.Rounds.Count)
-            {
-                game.CurrentRound = game.Rounds[_currentRoundIndex.Value];
-            }
-
-            if (_currentTurnIndex.HasValue && _currentTurnIndex.Value < game.Turns.Count)
-            {
-                game.CurrentTurn = game.Turns[_currentTurnIndex.Value];
             }
 
             return game;

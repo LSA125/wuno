@@ -1,25 +1,28 @@
+using System;
+using System.Data.Common;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using wuno.infrastructure;
 
 namespace Wuno.Testing.Fixtures
 {
-    public sealed class InMemoryAppDbContextFactory
+    public sealed class SqliteInMemoryAppDbContextFactory : IDisposable
     {
-        private readonly string _databaseName;
-        private readonly InMemoryDatabaseRoot _databaseRoot;
-        private readonly object _seedLock = new();
+        private readonly DbConnection _connection;
 
-        public InMemoryAppDbContextFactory(string? databaseName = null, InMemoryDatabaseRoot? root = null)
+        public SqliteInMemoryAppDbContextFactory()
         {
-            _databaseName = databaseName ?? Guid.NewGuid().ToString();
-            _databaseRoot = root ?? new InMemoryDatabaseRoot();
+            _connection = new SqliteConnection("Filename=:memory:");
+            _connection.Open();
+
+            using var ctx = CreateContext();
+            ctx.Database.EnsureCreated(); // Create schema once
         }
 
         public AppDbContext CreateContext(Action<AppDbContext>? seed = null)
         {
             var options = new DbContextOptionsBuilder<AppDbContext>()
-                .UseInMemoryDatabase(_databaseName, _databaseRoot)
+                .UseSqlite(_connection)
                 .EnableSensitiveDataLogging()
                 .Options;
 
@@ -27,11 +30,8 @@ namespace Wuno.Testing.Fixtures
 
             if (seed is not null)
             {
-                lock (_seedLock)
-                {
-                    seed(ctx);
-                    ctx.SaveChanges();
-                }
+                seed(ctx);
+                ctx.SaveChanges();
             }
 
             return ctx;
@@ -45,6 +45,11 @@ namespace Wuno.Testing.Fixtures
         public (AppDbContext First, AppDbContext Second) CreateConcurrentPair(Action<AppDbContext>? seed = null)
         {
             return (CreateContext(seed), CreateContext());
+        }
+
+        public void Dispose()
+        {
+            _connection.Dispose();
         }
     }
 }

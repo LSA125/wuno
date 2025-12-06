@@ -31,22 +31,22 @@ Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "wuno.client", "Wuno.Client\
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wuno.Application.Tests", "Wuno.Application.Tests\Wuno.Application.Tests.csproj", "{E5C60057-324C-4BAA-A1FB-A528E09AF72C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wuno.Application.Tests", "Wuno.Application.Tests\Wuno.Application.Tests.csproj", "{E5C60057-324C-4BAA-A1FB-A528E09AF72C}"
 	ProjectSection(ProjectDependencies) = postProject
 		{0B0B497C-DC63-48D3-81F6-B3EDD007139E} = {0B0B497C-DC63-48D3-81F6-B3EDD007139E}
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wuno.Api.Tests", "Wuno.Api.Tests\Wuno.Api.Tests.csproj", "{099C19B0-1FC6-44C4-BE4B-605EE85E3369}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wuno.Api.Tests", "Wuno.Api.Tests\Wuno.Api.Tests.csproj", "{099C19B0-1FC6-44C4-BE4B-605EE85E3369}"
 	ProjectSection(ProjectDependencies) = postProject
 		{ADDCCA6C-1D69-4D47-85D3-6C809528293E} = {ADDCCA6C-1D69-4D47-85D3-6C809528293E}
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wuno.Domain.Tests", "Wuno.Domain.Tests\Wuno.Domain.Tests.csproj", "{6D7EA8A1-14A8-4D57-86AA-9D82F16CE2DD}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wuno.Domain.Tests", "Wuno.Domain.Tests\Wuno.Domain.Tests.csproj", "{6D7EA8A1-14A8-4D57-86AA-9D82F16CE2DD}"
 	ProjectSection(ProjectDependencies) = postProject
 		{0A5C41E2-A23B-423E-AF14-75D0EAE34BE7} = {0A5C41E2-A23B-423E-AF14-75D0EAE34BE7}
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wuno.Testing", "Wuno.Testing\Wuno.Testing.csproj", "{71FFC7A1-357E-48E8-B28A-23A325564357}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wuno.Testing", "Wuno.Testing\Wuno.Testing.csproj", "{71FFC7A1-357E-48E8-B28A-23A325564357}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -88,11 +88,11 @@ Global
 		{6D7EA8A1-14A8-4D57-86AA-9D82F16CE2DD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6D7EA8A1-14A8-4D57-86AA-9D82F16CE2DD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6D7EA8A1-14A8-4D57-86AA-9D82F16CE2DD}.Release|Any CPU.Build.0 = Release|Any CPU
-					{71FFC7A1-357E-48E8-B28A-23A325564357}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-				{71FFC7A1-357E-48E8-B28A-23A325564357}.Debug|Any CPU.Build.0 = Debug|Any CPU
-				{71FFC7A1-357E-48E8-B28A-23A325564357}.Release|Any CPU.ActiveCfg = Release|Any CPU
-				{71FFC7A1-357E-48E8-B28A-23A325564357}.Release|Any CPU.Build.0 = Release|Any CPU
-EndGlobalSection
+		{71FFC7A1-357E-48E8-B28A-23A325564357}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{71FFC7A1-357E-48E8-B28A-23A325564357}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{71FFC7A1-357E-48E8-B28A-23A325564357}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{71FFC7A1-357E-48E8-B28A-23A325564357}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
@@ -100,8 +100,8 @@ EndGlobalSection
 		{E5C60057-324C-4BAA-A1FB-A528E09AF72C} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{099C19B0-1FC6-44C4-BE4B-605EE85E3369} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{6D7EA8A1-14A8-4D57-86AA-9D82F16CE2DD} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
-					{71FFC7A1-357E-48E8-B28A-23A325564357} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
-EndGlobalSection
+		{71FFC7A1-357E-48E8-B28A-23A325564357} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
+	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {13B36151-B990-44A6-AA43-DB91BD7ED324}
 	EndGlobalSection

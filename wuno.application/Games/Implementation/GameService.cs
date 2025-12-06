@@ -340,22 +340,26 @@ namespace Wuno.Application.Games.Implementation
               .Include(g => g.Effects)
               .FirstOrDefaultAsync(g => g.Id == gameId, ct);
             if (game is null) throw new Exception("Game not found");
-
-            if (game.CurrentRound is null) throw new Exception("No rounds found for game");
-            if (game.CurrentTurn is null) throw new Exception("No active turn found for game");
             List<PlayerState> players = game.Players
                 .Where(p => p.IsTaken)
                 .Select(p => State.PlayerToState(p))
                 .ToList();
-            Player currentPlayer = game.Players
-                .FirstOrDefault(p => p.Seat == game.CurrentTurn!.Seat)
-                ?? throw new Exception("Current turn player not found");
+            if (game.CurrentTurn is not null && game.CurrentRound is not null)
+            {
+                Player currentPlayer = game.Players
+                    .FirstOrDefault(p => p.Seat == game.CurrentTurn!.Seat)
+                    ?? throw new Exception("Current turn player not found");
 
-            TurnState turnState = BuildTurnState(game, game.CurrentTurn, currentPlayer, currentPlayer.TurnsPlayedThisRound);
-            return State.GameToState(game,
-                players,
-                State.RoundToState(game.CurrentRound),
-                turnState);
+                TurnState turnState = BuildTurnState(game, game.CurrentTurn, currentPlayer, currentPlayer.TurnsPlayedThisRound);
+                return State.GameToState(game,
+                    players,
+                    State.RoundToState(game.CurrentRound),
+                    turnState);
+            }
+            else
+            {
+                return new GameState(game.Id, game.Status, game.CurSeat, game.TargetWins, 0, players, null, null);
+            }
         }
         public async Task<GameCodeResponse> GetUserActiveGameCodeAsync(Guid userId, CancellationToken ct)
         {

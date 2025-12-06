@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -9,8 +10,29 @@ namespace wuno.domain.Rules
     {
         static readonly HashSet<char> Vowels = new("aeiou");
 
-        public static string Normalize(string w) =>
-          new string(w.ToLowerInvariant().Where(ch => ch is >= 'a' and <= 'z').ToArray());
+        public static string Normalize(string w)
+        {
+            if (string.IsNullOrWhiteSpace(w))
+                return string.Empty;
+
+            var decomposed = w.Normalize(NormalizationForm.FormD);
+            var sb = new StringBuilder(decomposed.Length);
+
+            foreach (var rune in decomposed.EnumerateRunes())
+            {
+                // strip accents
+                if (Rune.GetUnicodeCategory(rune) == UnicodeCategory.NonSpacingMark)
+                    continue;
+
+                var lowerRune = Rune.ToLowerInvariant(rune);
+                if (lowerRune.Value is >= 'a' and <= 'z')
+                {
+                    sb.Append((char)lowerRune.Value);
+                }
+            }
+
+            return sb.ToString();
+        }
 
         public static char? First(string w) { var s = Normalize(w); return s.Length == 0 ? null : s[0]; }
         public static char? Last(string w) { var s = Normalize(w); return s.Length == 0 ? null : s[^1]; }

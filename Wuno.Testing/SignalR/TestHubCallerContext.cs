@@ -8,18 +8,22 @@ namespace Wuno.Testing.SignalR
     {
         private readonly string _connectionId;
         private readonly CancellationTokenSource _cts = new();
+        private readonly string? _userIdentifier;
+        private readonly ClaimsPrincipal? _user;
+        private readonly IDictionary<object, object?> _items =
+            new Dictionary<object, object?>();
 
         public TestHubCallerContext(string connectionId, ClaimsPrincipal? user = null, string? userIdentifier = null)
         {
             _connectionId = connectionId;
-            User = user ?? new ClaimsPrincipal(new ClaimsIdentity());
-            UserIdentifier = userIdentifier;
+            _user = user ?? new ClaimsPrincipal(new ClaimsIdentity());
+            _userIdentifier = userIdentifier;
         }
 
         public override string ConnectionId => _connectionId;
-        public override string? UserIdentifier { get; set; }
-        public override ClaimsPrincipal User { get; set; }
-        public override IDictionary<object, object?> Items { get; set; } = new Dictionary<object, object?>();
+        public override string? UserIdentifier => _userIdentifier;
+        public override ClaimsPrincipal? User => _user;
+        public override IDictionary<object, object?> Items => _items;
         public override CancellationToken ConnectionAborted => _cts.Token;
         public override IFeatureCollection Features { get; } = new FeatureCollection();
 

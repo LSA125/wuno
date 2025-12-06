@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 
 namespace Wuno.Testing.SignalR
 {
-    public sealed class TestHubCallerClients : IHubCallerClients
+    public sealed class TestHubCallerClients : IHubCallerClients, IHubClients
     {
         private readonly ConcurrentDictionary<string, TestClientProxy> _targets = new();
 

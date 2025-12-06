@@ -11,8 +11,7 @@ namespace Wuno.Application.Games.Implementation
         public WordList()
         {
             var asm = Assembly.GetExecutingAssembly();
-            using var stream = typeof(WordList).Assembly.GetManifestResourceStream(
-                                   typeof(WordList), "words.txt")
+            using var stream = asm.GetManifestResourceStream("Wuno.Application.Games.words.txt")
                 ?? throw new InvalidOperationException("Embedded words.txt not found.");
             using var reader = new StreamReader(stream);
 

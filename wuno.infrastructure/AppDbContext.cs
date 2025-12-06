@@ -19,8 +19,8 @@ namespace wuno.infrastructure
             b.Entity<Game>().HasMany(g => g.Rounds).WithOne(r => r.Game).HasForeignKey(r => r.GameId).OnDelete(DeleteBehavior.Cascade);
             b.Entity<Game>().HasMany(g => g.Turns).WithOne(t => t.Game).HasForeignKey(t => t.GameId).OnDelete(DeleteBehavior.Cascade);
             b.Entity<Game>().HasMany(g => g.Effects).WithOne(e => e.Game).HasForeignKey(e => e.GameId).OnDelete(DeleteBehavior.Cascade);
-            b.Entity<Game>().HasOne(g => g.CurrentRound).WithMany().OnDelete(DeleteBehavior.SetNull);
-            b.Entity<Game>().HasOne(g => g.CurrentTurn).WithMany().OnDelete(DeleteBehavior.SetNull);
+            b.Entity<Game>().HasOne(g => g.CurrentRound).WithMany().OnDelete(DeleteBehavior.Restrict);
+            b.Entity<Game>().HasOne(g => g.CurrentTurn).WithMany().OnDelete(DeleteBehavior.Restrict);
             b.Entity<Player>().HasOne(p => p.Game).WithMany(g => g.Players).HasForeignKey(p => p.GameId).OnDelete(DeleteBehavior.Cascade);
             b.Entity<User>().HasOne(u => u.ActivePlayer).WithOne(p => p.User).HasForeignKey<Player>(p => p.UserId).OnDelete(DeleteBehavior.SetNull);
             b.Entity<Effect>().HasOne(e => e.Round).WithMany().OnDelete(DeleteBehavior.Restrict);

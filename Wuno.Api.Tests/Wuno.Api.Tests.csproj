@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\wuno.api\Wuno.Api.csproj" />
     <ProjectReference Include="..\Wuno.Testing\Wuno.Testing.csproj" />
   </ItemGroup>
 
