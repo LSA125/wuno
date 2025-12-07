@@ -174,7 +174,7 @@ namespace Wuno.Application.Games.Implementation
                 {
                     GameId = game.Id,
                     RoundId = round.Id,
-                    Index = await _db.Turns.CountAsync(t => t.GameId == game.Id && t.RoundId == round.Id, ct),
+                    Index = await _db.Turns.CountAsync(t => t.GameId == game.Id, ct),
                     Seat = nextPlayer.Seat,
                     FreeStart = applied.FreeStart,
                     MinLen = applied.MinLen,
