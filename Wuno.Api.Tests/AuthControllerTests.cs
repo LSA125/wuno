@@ -33,7 +33,7 @@ public sealed class AuthControllerTests
     [Fact]
     public async Task Register_MissingFields_ReturnsBadRequest()
     {
-        var factory = new InMemoryAppDbContextFactory();
+        var factory = new SqliteInMemoryAppDbContextFactory();
         await using var db = factory.CreateContext();
         var auth = new FakeAuthService();
         var controller = CreateController(db, auth);
@@ -47,7 +47,7 @@ public sealed class AuthControllerTests
     [Fact]
     public async Task Register_DuplicateUsername_ReturnsConflict()
     {
-        var factory = new InMemoryAppDbContextFactory();
+        var factory = new SqliteInMemoryAppDbContextFactory();
         await using var db = factory.CreateContextWithSeed(new User
         {
             Id = Guid.NewGuid(),
@@ -68,7 +68,7 @@ public sealed class AuthControllerTests
     [Fact]
     public async Task Register_SameNameInParallel_OnlyOneSucceeds()
     {
-        var dbFactory = new InMemoryAppDbContextFactory(databaseName: "concurrent-users");
+        var dbFactory = new SqliteInMemoryAppDbContextFactory();
         var authA = new FakeAuthService();
         var authB = new FakeAuthService();
 
@@ -93,7 +93,7 @@ public sealed class AuthControllerTests
     [Fact]
     public async Task Login_InvalidPassword_ReturnsUnauthorized()
     {
-        var factory = new InMemoryAppDbContextFactory();
+        var factory = new SqliteInMemoryAppDbContextFactory();
         var hasher = new PasswordHasher<User>();
         var user = new User
         {
@@ -117,7 +117,7 @@ public sealed class AuthControllerTests
     [Fact]
     public async Task Me_WithInvalidPrincipal_ReturnsUnauthorized()
     {
-        await using var db = new InMemoryAppDbContextFactory().CreateContext();
+        await using var db = new SqliteInMemoryAppDbContextFactory().CreateContext();
         var auth = new FakeAuthService();
         var controller = CreateController(db, auth);
         controller.ControllerContext.HttpContext!.User = new ClaimsPrincipal(new ClaimsIdentity());

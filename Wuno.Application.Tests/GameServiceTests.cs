@@ -110,16 +110,11 @@ public sealed class GameServiceTests
             .AddPlayer(new PlayerBuilder().AtSeat(2))
             .Build();
 
-        // Seed in its own context
-        using (var seedCtx = factory.CreateContext())
-        {
-            seedCtx.Games.Add(seedGame);
-            await seedCtx.SaveChangesAsync();
-        }
-
         // Fresh context for service + assertions
         using var db = factory.CreateContext();
         var service = CreateService(db);
+        db.Games.Add(seedGame);
+        await db.SaveChangesAsync();
 
         var turn = await service.StartMatchAsync(seedGame.Id, CancellationToken.None);
 
@@ -131,8 +126,8 @@ public sealed class GameServiceTests
             .SingleAsync();
 
         Assert.Equal(GameStatus.ACTIVE, saved.Status);
-        Assert.Equal(1, saved.Rounds.Count);
-        Assert.Equal(1, saved.Turns.Count);
+        Assert.Single(saved.Rounds);
+        Assert.Single(saved.Turns);
         Assert.NotNull(saved.CurrentRound);
         Assert.NotNull(saved.CurrentTurn);
         Assert.Equal(saved.CurrentTurn!.Id, turn.TurnId);
@@ -180,29 +175,18 @@ public sealed class GameServiceTests
             .CurrentSeat(1)
             .Build();
 
-        // 1. Seed in its own context
-        using (var seedCtx = factory.CreateContext())
-        {
-            seedCtx.Games.Add(seedGame);
-            await seedCtx.SaveChangesAsync();
-
-            // Set CurrentRound/CurrentTurn on the tracked entities and persist
-            var game = await seedCtx.Games
-                .Include(g => g.Rounds)
-                .Include(g => g.Turns)
-                .SingleAsync();
-
-            game.CurrentRound = game.Rounds[0];
-            game.CurrentTurn = game.Turns[0];
-            await seedCtx.SaveChangesAsync();
-        }
-
         // 2. Use a fresh context for the service call
         using var db = factory.CreateContext();
         var service = CreateService(db);
 
+        db.Games.Add(seedGame);
+       
+        await db.SaveChangesAsync();
+        seedGame.CurrentTurn = seedGame.Turns[0];
+        seedGame.CurrentRound = seedGame.Rounds[0];
         var gameId = seedGame.Id;
         var turnId = seedGame.Turns[0].Id;
+        await db.SaveChangesAsync();
 
         var state = await service.TimeoutAndAdvanceAsync(gameId, turnId, CancellationToken.None);
 

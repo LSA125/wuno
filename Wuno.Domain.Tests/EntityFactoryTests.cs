@@ -57,8 +57,6 @@ namespace Wuno.Domain.Tests
                 .TargetWins(-5)
                 .CurrentSeat(-10)
                 .Direction(-1)
-                .CurrentRoundIndex(0)
-                .CurrentTurnIndex(0)
                 .AddPlayer(player)
                 .AddRound(roundBuilder)
                 .AddTurn(turnBuilder)
@@ -95,8 +93,6 @@ namespace Wuno.Domain.Tests
         public void GameBuilder_does_not_set_current_round_or_turn_out_of_range()
         {
             var game = new GameBuilder()
-                .CurrentRoundIndex(5)
-                .CurrentTurnIndex(3)
                 .Build();
 
             Assert.Empty(game.Rounds);

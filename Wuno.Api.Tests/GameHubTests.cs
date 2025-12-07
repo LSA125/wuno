@@ -6,194 +6,168 @@ using Wuno.Application.Games.Inheritance;
 using Wuno.Application.Games.Util;
 using Wuno.Testing.SignalR;
 
-public sealed class GameHubTests
+namespace Wuno.Api.Tests
 {
-    [Fact]
-    public async Task ConnectToGame_BroadcastsStateAndTracksSession()
+    public sealed class GameHubTests
     {
-        var tracker = new InMemoryGroupTracker();
-        var turnTimer = new Wuno.Testing.Fixtures.FakeTurnTimer();
-        var clients = new TestHubCallerClients();
-        var hubContext = new TestHubContext(clients);
-        var service = FakeGameService.ForJoin(new JoinGameResponse(Guid.NewGuid(),
-            new GameState(Guid.NewGuid(), wuno.domain.GameStatus.ACTIVE, 0, 1, 2, new List<PlayerState>
-            {
-                new PlayerState(Guid.NewGuid(), 0, true, true, "p1", null, 0, null)
-            },
-            new RoundState(Guid.NewGuid(), 0, null, DateTime.UtcNow, null),
-            new TurnState(Guid.NewGuid(), 0, 0, DateTime.UtcNow, DateTime.UtcNow.AddSeconds(5), 1, false, new List<EffectState>()))));
 
-        var hub = CreateHub(service, tracker, turnTimer, hubContext, clients, userId: Guid.NewGuid());
-
-        await hub.ConnectToGame("CODE");
-
-        Assert.True(tracker.TryGet(hub.Context.ConnectionId, out _));
-        Assert.Contains(clients.CallerProxy.Invocations, i => i.Method == "ConnectedToGame");
-        Assert.Contains(clients.GetProxyForTarget($"group:{service.LastGameId}").Invocations, i => i.Method == "PlayersUpdated");
-    }
-
-    [Fact]
-    public async Task SubmitWord_CancelsTimeoutAndBroadcasts()
-    {
-        var tracker = new InMemoryGroupTracker();
-        var turnTimer = new Wuno.Testing.Fixtures.FakeTurnTimer();
-        var clients = new TestHubCallerClients();
-        var hubContext = new TestHubContext(clients);
-        var initialTurn = Guid.NewGuid();
-        var nextTurn = Guid.NewGuid();
-        var service = FakeGameService.ForTurn(new ProcessTurnOutcome(true, null, new GameState(Guid.NewGuid(), wuno.domain.GameStatus.ACTIVE, 0, 1, 2,
-            new List<PlayerState> { new PlayerState(Guid.NewGuid(), 0, true, true, "p1", null, 0, null) },
-            new RoundState(Guid.NewGuid(), 0, null, DateTime.UtcNow, null),
-            new TurnState(nextTurn, 1, 0, DateTime.UtcNow, DateTime.UtcNow.AddSeconds(5), 1, false, new List<EffectState>()))));
-
-        var hub = CreateHub(service, tracker, turnTimer, hubContext, clients, userId: Guid.NewGuid());
-        tracker.Add(hub.Context.ConnectionId, new PlayerSession(service.LastGameId, Guid.NewGuid(), 0, service.TestUser));
-        turnTimer.Schedule(service.LastGameId, initialTurn, DateTime.UtcNow.AddSeconds(1), _ => Task.CompletedTask);
-
-        await hub.SubmitWord(service.LastGameId, Guid.NewGuid(), initialTurn, "word");
-
-        Assert.DoesNotContain(turnTimer.Scheduled.Keys, k => k == initialTurn);
-        Assert.Contains(turnTimer.Scheduled.Keys, k => k == nextTurn);
-        Assert.Contains(clients.GetProxyForTarget($"group:{service.LastGameId}").Invocations, i => i.Method == "GameUpdated");
-    }
-
-    [Fact]
-    public async Task SubmitWord_RejectedOutcomeNotifiesCallerOnly()
-    {
-        var tracker = new InMemoryGroupTracker();
-        var turnTimer = new Wuno.Testing.Fixtures.FakeTurnTimer();
-        var clients = new TestHubCallerClients();
-        var hubContext = new TestHubContext(clients);
-        var service = FakeGameService.ForTurn(new ProcessTurnOutcome(false, "bad", null));
-
-        var hub = CreateHub(service, tracker, turnTimer, hubContext, clients, userId: Guid.NewGuid());
-        tracker.Add(hub.Context.ConnectionId, new PlayerSession(service.LastGameId, Guid.NewGuid(), 0, service.TestUser));
-
-        await hub.SubmitWord(service.LastGameId, Guid.NewGuid(), Guid.NewGuid(), "bad");
-
-        Assert.Contains(clients.CallerProxy.Invocations, i => i.Method == "WordRejected");
-        Assert.Empty(clients.GetProxyForTarget($"group:{service.LastGameId}").Invocations);
-    }
-
-    private static GameHub CreateHub(FakeGameService service, IGroupTracker tracker, Wuno.Testing.Fixtures.FakeTurnTimer timer, IHubContext<GameHub> hubContext, TestHubCallerClients clients, Guid userId)
-    {
-        var hub = new GameHub(service, hubContext, tracker, new AllowTypingGate(), timer)
+        [Fact]
+        public async Task SubmitWord_CancelsTimeout()
         {
-            Context = new Wuno.Testing.SignalR.TestHubCallerContext("conn-1", new ClaimsPrincipal(new ClaimsIdentity(new[]
-            {
-                new Claim(ClaimTypes.NameIdentifier, userId.ToString())
-            }, "cookie")), userId.ToString()),
-            Clients = clients,
-            Groups = new TestGroupManager()
-        };
-        return hub;
-    }
-
-    private sealed class AllowTypingGate : ITypingGate
-    {
-        public bool tryAllow(string key, TimeSpan interval) => true;
-    }
-
-    private sealed class InMemoryGroupTracker : IGroupTracker
-    {
-        private readonly Dictionary<string, PlayerSession> _sessions = new();
-        public Guid TestUser { get; } = Guid.NewGuid();
-
-        public void Add(string connectionId, PlayerSession session) => _sessions[connectionId] = session;
-
-        public bool Remove(string connectionId, out PlayerSession session, out bool isLast)
-        {
-            isLast = _sessions.Count <= 1;
-            var removed = _sessions.Remove(connectionId, out session!);
-            return removed;
-        }
-
-        public bool TryGet(string connectionId, out PlayerSession session) => _sessions.TryGetValue(connectionId, out session!);
-    }
-
-    private sealed class FakeGameService : IGameService
-    {
-        public Guid TestUser { get; } = Guid.NewGuid();
-        public Guid LastGameId { get; private set; } = Guid.NewGuid();
-        private readonly JoinGameResponse? _join;
-        private readonly ProcessTurnOutcome? _turnOutcome;
-
-        private FakeGameService(JoinGameResponse join, ProcessTurnOutcome outcome)
-        {
-            _join = join;
-            _turnOutcome = outcome;
-        }
-
-        public static FakeGameService ForJoin(JoinGameResponse join)
-        {
-            return new FakeGameService(join, new ProcessTurnOutcome(false, "unused", null));
-        }
-
-        public static FakeGameService ForTurn(ProcessTurnOutcome outcome)
-        {
-            var state = outcome.State ?? new GameState(Guid.NewGuid(), wuno.domain.GameStatus.ACTIVE, 0, 1, 2, new List<PlayerState>(),
+            var tracker = new InMemoryGroupTracker();
+            var turnTimer = new Testing.Fixtures.FakeTurnTimer();
+            var clients = new TestHubCallerClients();
+            var hubContext = new TestHubContext(clients);
+            var initialTurn = Guid.NewGuid();
+            var nextTurn = Guid.NewGuid();
+            var service = FakeGameService.ForTurn(new ProcessTurnOutcome(true, null, new GameState(Guid.NewGuid(), wuno.domain.GameStatus.ACTIVE, 0, 1, 2,
+                [new PlayerState(Guid.NewGuid(), 0, true, true, "p1", null, 0, null)],
                 new RoundState(Guid.NewGuid(), 0, null, DateTime.UtcNow, null),
-                new TurnState(Guid.NewGuid(), 0, 0, DateTime.UtcNow, DateTime.UtcNow, 1, false, new List<EffectState>()));
-            var join = new JoinGameResponse(Guid.NewGuid(), state);
-            return new FakeGameService(join, outcome);
+                new TurnState(nextTurn, 1, 0, DateTime.UtcNow, DateTime.UtcNow.AddSeconds(5), 1, false, []))));
+
+            var hub = CreateHub(service, tracker, turnTimer, hubContext, clients, userId: Guid.NewGuid());
+            tracker.Add(hub.Context.ConnectionId, new PlayerSession(service.LastGameId, Guid.NewGuid(), 0, service.TestUser));
+            turnTimer.Schedule(service.LastGameId, initialTurn, DateTime.UtcNow.AddSeconds(1), _ => Task.CompletedTask);
+
+            await hub.SubmitWord(service.LastGameId, Guid.NewGuid(), initialTurn, "word");
+
+            Assert.DoesNotContain(turnTimer.Scheduled.Keys, k => k == initialTurn);
+            Assert.Contains(turnTimer.Scheduled.Keys, k => k == nextTurn);
         }
 
-        public Task<Guid> GetGameId(string code, CancellationToken ct)
+        [Fact]
+        public async Task SubmitWord_RejectedOutcomeNotifiesCallerOnly()
         {
-            LastGameId = _join!.State.GameId;
-            return Task.FromResult(LastGameId);
+            var tracker = new InMemoryGroupTracker();
+            var turnTimer = new Testing.Fixtures.FakeTurnTimer();
+            var clients = new TestHubCallerClients();
+            var hubContext = new TestHubContext(clients);
+            var service = FakeGameService.ForTurn(new ProcessTurnOutcome(false, "bad", null));
+
+            var hub = CreateHub(service, tracker, turnTimer, hubContext, clients, userId: Guid.NewGuid());
+            tracker.Add(hub.Context.ConnectionId, new PlayerSession(service.LastGameId, Guid.NewGuid(), 0, service.TestUser));
+
+            await hub.SubmitWord(service.LastGameId, Guid.NewGuid(), Guid.NewGuid(), "bad");
+
+            Assert.Contains(clients.CallerProxy.Invocations, i => i.Method == "WordRejected");
+            Assert.Empty(clients.GetProxyForTarget($"group:{service.LastGameId}").Invocations);
         }
 
-        public Task<JoinGameResponse> JoinGameAsync(Guid gameId, Guid userId, CancellationToken ct)
+        private static GameHub CreateHub(FakeGameService service, IGroupTracker tracker, Testing.Fixtures.FakeTurnTimer timer, IHubContext<GameHub> hubContext, TestHubCallerClients clients, Guid userId)
         {
-            return Task.FromResult(_join!);
+            var hub = new GameHub(service, hubContext, tracker, new AllowTypingGate(), timer)
+            {
+                Context = new TestHubCallerContext("conn-1", new ClaimsPrincipal(new ClaimsIdentity(
+                [
+                    new Claim(ClaimTypes.NameIdentifier, userId.ToString())
+                ], "cookie")), userId.ToString()),
+                Clients = clients,
+                Groups = new TestGroupManager()
+            };
+            return hub;
         }
 
-        public Task<List<PlayerState>> GetPlayersAsync(Guid gameId, CancellationToken ct)
+        private sealed class AllowTypingGate : ITypingGate
         {
-            return Task.FromResult(_join!.State.Players);
+            public bool tryAllow(string key, TimeSpan interval) => true;
         }
 
-        public Task<ProcessTurnOutcome> ProcessTurnAsync(Guid gameId, Guid roundId, Guid turnId, Guid playerId, int seat, string word, CancellationToken ct)
+        private sealed class InMemoryGroupTracker : IGroupTracker
         {
-            return Task.FromResult(_turnOutcome!);
+            private readonly Dictionary<string, PlayerSession> _sessions = [];
+            public Guid TestUser { get; } = Guid.NewGuid();
+
+            public void Add(string connectionId, PlayerSession session) => _sessions[connectionId] = session;
+
+            public bool Remove(string connectionId, out PlayerSession session, out bool isLast)
+            {
+                isLast = _sessions.Count <= 1;
+                var removed = _sessions.Remove(connectionId, out session!);
+                return removed;
+            }
+
+            public bool TryGet(string connectionId, out PlayerSession session) => _sessions.TryGetValue(connectionId, out session!);
         }
 
-        public Task<GameState> GetGameStateAsync(Guid gameId, CancellationToken ct)
+        private sealed class FakeGameService : IGameService
         {
-            return Task.FromResult(_join!.State);
+            public Guid TestUser { get; } = Guid.NewGuid();
+            public Guid LastGameId { get; private set; } = Guid.NewGuid();
+            private readonly JoinGameResponse? _join;
+            private readonly ProcessTurnOutcome? _turnOutcome;
+
+            private FakeGameService(JoinGameResponse join, ProcessTurnOutcome outcome)
+            {
+                _join = join;
+                _turnOutcome = outcome;
+            }
+
+            public static FakeGameService ForJoin(JoinGameResponse join)
+            {
+                return new FakeGameService(join, new ProcessTurnOutcome(false, "unused", null));
+            }
+
+            public static FakeGameService ForTurn(ProcessTurnOutcome outcome)
+            {
+                var state = outcome.State ?? new GameState(Guid.NewGuid(), wuno.domain.GameStatus.ACTIVE, 0, 1, 2, new List<PlayerState>(),
+                    new RoundState(Guid.NewGuid(), 0, null, DateTime.UtcNow, null),
+                    new TurnState(Guid.NewGuid(), 0, 0, DateTime.UtcNow, DateTime.UtcNow, 1, false, new List<EffectState>()));
+                var join = new JoinGameResponse(Guid.NewGuid(), state);
+                return new FakeGameService(join, outcome);
+            }
+
+            public Task<Guid> GetGameId(string code, CancellationToken ct)
+            {
+                LastGameId = _join!.State.GameId;
+                return Task.FromResult(LastGameId);
+            }
+
+            public Task<JoinGameResponse> JoinGameAsync(Guid gameId, Guid userId, CancellationToken ct)
+            {
+                return Task.FromResult(_join!);
+            }
+
+            public Task<List<PlayerState>> GetPlayersAsync(Guid gameId, CancellationToken ct)
+            {
+                return Task.FromResult(_join!.State.Players);
+            }
+
+            public Task<ProcessTurnOutcome> ProcessTurnAsync(Guid gameId, Guid roundId, Guid turnId, Guid playerId, int seat, string word, CancellationToken ct)
+            {
+                return Task.FromResult(_turnOutcome!);
+            }
+
+            public Task<GameState> GetGameStateAsync(Guid gameId, CancellationToken ct)
+            {
+                return Task.FromResult(_join!.State);
+            }
+
+            public Task<bool> AreAllPlayersReadyAsync(Guid gameId, CancellationToken ct) => Task.FromResult(true);
+            public Task<NewGameResponse> StartNewGameAsync(NewGameRequest req, CancellationToken ct) => Task.FromResult(new NewGameResponse("", 0, 0));
+            public Task<bool> MarkMatchAsStartedAsync(Guid gameId, CancellationToken ct) => Task.FromResult(true);
+            public Task<TurnState> StartMatchAsync(Guid gameId, CancellationToken ct) => Task.FromResult(_join!.State.CurrentTurn);
+            public Task<int> GetCurrentSeatAsync(Guid gameId, CancellationToken ct) => Task.FromResult(_join!.State.CurrentTurn.Seat);
+            public Task<GameCodeResponse> GetUserActiveGameCodeAsync(Guid userId, CancellationToken ct) => Task.FromResult(new GameCodeResponse(true, true, ""));
+            public Task<(Guid gameId, List<PlayerState> players)> DisconnectProtocolAsync(Guid playerId, CancellationToken ct) => Task.FromResult((Guid.NewGuid(), new List<PlayerState>()));
+            public Task LeaveGameAsync(Guid userId, CancellationToken ct) => Task.CompletedTask;
+            public Task ReadyAsync(Guid gameId, int seat, bool isReady, CancellationToken ct) => Task.CompletedTask;
+            public Task ForceEndGame(Guid gameId, CancellationToken ct) => Task.CompletedTask;
+            public Task<GameState?> TimeoutAndAdvanceAsync(Guid gameId, Guid turnId, CancellationToken ct) => Task.FromResult<GameState?>(_join!.State);
         }
 
-        public Task<bool> AreAllPlayersReadyAsync(Guid gameId, CancellationToken ct) => Task.FromResult(true);
-        public Task<NewGameResponse> StartNewGameAsync(NewGameRequest req, CancellationToken ct) => Task.FromResult(new NewGameResponse("", 0, 0));
-        public Task<bool> MarkMatchAsStartedAsync(Guid gameId, CancellationToken ct) => Task.FromResult(true);
-        public Task<TurnState> StartMatchAsync(Guid gameId, CancellationToken ct) => Task.FromResult(_join!.State.CurrentTurn);
-        public Task<int> GetCurrentSeatAsync(Guid gameId, CancellationToken ct) => Task.FromResult(_join!.State.CurrentTurn.Seat);
-        public Task<GameCodeResponse> GetUserActiveGameCodeAsync(Guid userId, CancellationToken ct) => Task.FromResult(new GameCodeResponse(true, true, ""));
-        public Task<(Guid gameId, List<PlayerState> players)> DisconnectProtocolAsync(Guid playerId, CancellationToken ct) => Task.FromResult((Guid.NewGuid(), new List<PlayerState>()));
-        public Task LeaveGameAsync(Guid userId, CancellationToken ct) => Task.CompletedTask;
-        public Task ReadyAsync(Guid gameId, int seat, bool isReady, CancellationToken ct) => Task.CompletedTask;
-        public Task ForceEndGame(Guid gameId, CancellationToken ct) => Task.CompletedTask;
-        public Task<GameState?> TimeoutAndAdvanceAsync(Guid gameId, Guid turnId, CancellationToken ct) => Task.FromResult<GameState?>(_join!.State);
-    }
-
-    private sealed class TestHubContext : IHubContext<GameHub>
-    {
-        public TestHubContext(IHubClients clients)
+        private sealed class TestHubContext(IHubClients clients) : IHubContext<GameHub>
         {
-            Clients = clients;
+            public IHubClients Clients { get; } = clients;
+            public IGroupManager Groups { get; } = new TestGroupManager();
         }
 
-        public IHubClients Clients { get; }
-        public IGroupManager Groups { get; } = new TestGroupManager();
-    }
+        private sealed class TestGroupManager : IGroupManager
+        {
+            public Task AddToGroupAsync(string connectionId, string groupName, CancellationToken cancellationToken = default)
+                => Task.CompletedTask;
 
-    private sealed class TestGroupManager : IGroupManager
-    {
-        public Task AddToGroupAsync(string connectionId, string groupName, CancellationToken cancellationToken = default)
-            => Task.CompletedTask;
-
-        public Task RemoveFromGroupAsync(string connectionId, string groupName, CancellationToken cancellationToken = default)
-            => Task.CompletedTask;
+            public Task RemoveFromGroupAsync(string connectionId, string groupName, CancellationToken cancellationToken = default)
+                => Task.CompletedTask;
+        }
     }
 }

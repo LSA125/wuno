@@ -17,17 +17,12 @@ using Wuno.Domain.Rules;
 
 namespace Wuno.Application.Games.Implementation
 {
-    public sealed class GameService : IGameService
+    public sealed class GameService(AppDbContext db, IWordList wl, ICodeGeneratorService cg, ITurnTimer tt) : IGameService
     {
-        private readonly AppDbContext _db;
-        private readonly IWordList _wl;
-        private readonly ICodeGeneratorService _cg;
-        private readonly ITurnTimer _tt;
-        public GameService(AppDbContext db, IWordList wl, ICodeGeneratorService cg, ITurnTimer tt)
-        {
-            _db = db; _wl = wl; _cg = cg;
-            _tt = tt;
-        }
+        private readonly AppDbContext _db = db;
+        private readonly IWordList _wl = wl;
+        private readonly ICodeGeneratorService _cg = cg;
+        private readonly ITurnTimer _tt = tt;
 
         public async Task<Guid> GetGameId(string code, CancellationToken ct)
         {
@@ -104,31 +99,30 @@ namespace Wuno.Application.Games.Implementation
         public async Task<TurnState> StartMatchAsync(Guid gameId, CancellationToken ct)
         {
             var game = await _db.Games
-                .AsSplitQuery()
                 .Include(g => g.Players)
-                .Include(g => g.Rounds)
-                .Include(g => g.Turns)
-                .Include(g => g.Effects)
-                .Include(g => g.CurrentTurn)
                 .FirstAsync(g => g.Id == gameId, ct);
 
             ResetPlayers(game.Players);
+            game.Status = GameStatus.ACTIVE;
+
+            int roundIndex = await _db.Rounds
+                .CountAsync(r => r.GameId == gameId, ct);
 
             var round = new Round
             {
                 GameId = game.Id,
-                Index = game.Rounds.Count,
+                Index = roundIndex,
                 StartedAt = DateTime.UtcNow
             };
-            game.Rounds.Add(round);
+
+            _db.Rounds.Add(round);
             game.CurrentRound = round;
 
-            Player? firstPlayer = FindNextValidPlayer(game.Players, game.CurSeat);
-            if (firstPlayer is null)
-            {
-                throw new Exception("No valid player on first round");
-            }
-            TurnState firstTurn = CreateTurn(game, round, firstPlayer, DateTime.UtcNow);
+            var firstPlayer = FindNextValidPlayer(game.Players, game.CurSeat)
+                ?? throw new Exception("No valid player on first round");
+
+            TurnState firstTurn = await CreateTurnAsync(game, round, firstPlayer, DateTime.UtcNow, ct);
+
             await _db.SaveChangesAsync(ct);
             return firstTurn;
         }
@@ -141,7 +135,7 @@ namespace Wuno.Application.Games.Implementation
 
             return State.TurnToState(turn, effects);
         }
-        private TurnState CreateTurn(Game game, Round round, Player nextPlayer, DateTime now)
+        private async Task<TurnState> CreateTurnAsync(Game game, Round round, Player nextPlayer, DateTime now, CancellationToken ct)
         {
             var previous = game.CurrentTurn;
             Turn newTurn;
@@ -164,10 +158,14 @@ namespace Wuno.Application.Games.Implementation
             else
             {
                 var personalIndex = nextPlayer.TurnsPlayedThisRound;
-                effects = game.Effects
-                    .Where(e => e.RoundId == round.Id && e.TargetSeat == nextPlayer.Seat && e.AppliesOnTurn == personalIndex)
+                effects = await _db.Effects
+                    .AsNoTracking()
+                    .Where(e => e.GameId == game.Id &&
+                                e.RoundId == round.Id &&
+                                e.TargetSeat == nextPlayer.Seat &&
+                                e.AppliesOnTurn == personalIndex)
                     .Select(e => new EffectState(e.Type, e.Value))
-                    .ToList();
+                    .ToListAsync(ct);
 
                 var baseC = Constraints.Base(previous.Word?.LastOrDefault(), personalIndex, nextPlayer.LastWord);
                 Constraints applied = EffectsLogic.Apply(baseC, effects);
@@ -197,11 +195,7 @@ namespace Wuno.Application.Games.Implementation
             await using IDbContextTransaction tx = await _db.Database.BeginTransactionAsync(ct);
 
             Game? game = await _db.Games
-                .AsSplitQuery()
                 .Include(g => g.Players)
-                .Include(g => g.Rounds)
-                .Include(g => g.Turns)
-                .Include(g => g.Effects)
                 .Include(g => g.CurrentRound)
                 .Include(g => g.CurrentTurn)
                 .FirstOrDefaultAsync(g => g.Id == gameId, ct);
@@ -245,7 +239,7 @@ namespace Wuno.Application.Games.Implementation
                     return new(false, $"Word must start with '{game.LastWord!.Last()}'", null);
                 }
 
-                bool playedThisRound = game.Turns.Any(t => t.RoundId == roundId && t.Word == w);
+                bool playedThisRound = await _db.Turns.AnyAsync(t => t.GameId == gameId && t.RoundId == roundId && t.Word == w, ct);
                 if (playedThisRound) return new(false, "Word already played this round", null);
 
                 currentTurn.Word = w;
@@ -270,7 +264,7 @@ namespace Wuno.Application.Games.Implementation
                 if (winner is not null)
                 {
                     winner.RoundWins += 1;
-                    matchEnded = winner.RoundWins >= game.TargetWins;
+                    matchEnded = winner.RoundWins >= game.TargetWins || game.Players.Count(p => p.IsTaken) <= 1; ;
                 }
 
                 if (matchEnded)
@@ -294,7 +288,7 @@ namespace Wuno.Application.Games.Implementation
                     Player? firstPlayer = FindNextValidPlayer(game.Players, startSeat - 1)
                         ?? throw new Exception("No valid player to start round");
 
-                    currentTurnState = CreateTurn(game, nextRound, firstPlayer, now);
+                    currentTurnState = await CreateTurnAsync(game, nextRound, firstPlayer, now, ct);
                 }
             }
 
@@ -302,7 +296,7 @@ namespace Wuno.Application.Games.Implementation
             {
                 Player? nextPlayer = FindNextValidPlayer(game.Players, game.CurSeat)
                     ?? throw new Exception("No valid player to start turn");
-                currentTurnState = CreateTurn(game, game.CurrentRound!, nextPlayer, now);
+                currentTurnState = await CreateTurnAsync(game, game.CurrentRound!, nextPlayer, now, ct);
             }
 
             if (currentTurnState is null)
@@ -433,22 +427,16 @@ namespace Wuno.Application.Games.Implementation
         {
             var game = await _db.Games
               .Include(g => g.Players)
-              .FirstOrDefaultAsync(g => g.Id == gameId, ct);
-            if (game is null) throw new Exception("Game not found");
+              .FirstOrDefaultAsync(g => g.Id == gameId, ct) ?? throw new Exception("Game not found");
             //check for reconnect
-            User? user = _db.Users.Include(u => u.ActivePlayer).FirstOrDefault(u => u.Id == userId);
-            if (user is null)
-            {
-                throw new Exception("User does not exist when joining game");
-            }
+            User? user = _db.Users.Include(u => u.ActivePlayer).FirstOrDefault(u => u.Id == userId) ?? throw new Exception("User does not exist when joining game");
             Player? player = user.ActivePlayer;
             //if player is already in a game
             if (player is not null && player.GameId == gameId && player.IsTaken)
             {
                 player.IsConnected = true;
                 await _db.SaveChangesAsync(ct);
-                GameState? gameState = await GetGameStateAsync(gameId, ct);
-                if (gameState is null) throw new Exception("Failed to get game state after joining");
+                GameState? gameState = await GetGameStateAsync(gameId, ct) ?? throw new Exception("Failed to get game state after joining");
                 return new JoinGameResponse(player.Id, gameState);
             }
             else if (game.Status != GameStatus.WAITING) throw new Exception("Game not joinable");
@@ -478,8 +466,7 @@ namespace Wuno.Application.Games.Implementation
         {
             var user = await _db.Users
                 .Include(u => u.ActivePlayer)
-                .FirstOrDefaultAsync(u => u.Id == userId, ct);
-            if (user is null) throw new Exception("User not found when leaving game");
+                .FirstOrDefaultAsync(u => u.Id == userId, ct) ?? throw new Exception("User not found when leaving game");
             user.ActivePlayer!.IsConnected = false;
             user.ActivePlayer.IsTaken = false;
             user.ActivePlayer = null;
@@ -492,11 +479,7 @@ namespace Wuno.Application.Games.Implementation
             await using IDbContextTransaction tx = await _db.Database.BeginTransactionAsync(ct);
 
             Game? game = await _db.Games
-                .AsSplitQuery()
                 .Include(g => g.Players)
-                .Include(g => g.Rounds)
-                .Include(g => g.Turns)
-                .Include(g => g.Effects)
                 .Include(g => g.CurrentRound)
                 .Include(g => g.CurrentTurn)
                 .FirstOrDefaultAsync(g => g.Id == gameId, ct);
@@ -547,7 +530,7 @@ namespace Wuno.Application.Games.Implementation
                 if (winner is not null)
                 {
                     winner.RoundWins += 1;
-                    matchEnded = winner.RoundWins >= game.TargetWins;
+                    matchEnded = winner.RoundWins >= game.TargetWins || game.Players.Count(p => p.IsTaken) <= 1;
                 }
 
                 if (matchEnded)
@@ -571,7 +554,7 @@ namespace Wuno.Application.Games.Implementation
                     Player? firstPlayer = FindNextValidPlayer(game.Players, startSeat - 1)
                         ?? throw new Exception("No valid player to start round");
 
-                    currentTurnState = CreateTurn(game, nextRound, firstPlayer, now);
+                    currentTurnState = await CreateTurnAsync(game, nextRound, firstPlayer, now, ct);
                 }
             }
 
@@ -579,7 +562,7 @@ namespace Wuno.Application.Games.Implementation
             {
                 Player? nextPlayer = FindNextValidPlayer(game.Players, game.CurSeat)
                     ?? throw new Exception("No valid player to start turn");
-                currentTurnState = CreateTurn(game, game.CurrentRound!, nextPlayer, now);
+                currentTurnState = await CreateTurnAsync(game, game.CurrentRound!, nextPlayer, now, ct);
             }
 
             if (currentTurnState is null)
