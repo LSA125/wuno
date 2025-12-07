@@ -1,7 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using Wuno.Application.Games.Implementation;
 using Wuno.Application.Games.Inheritance;
 using Wuno.Application.Games.Util;
@@ -9,7 +6,6 @@ using Wuno.Testing.Builders;
 using Wuno.Testing.Fixtures;
 using wuno.domain;
 using wuno.infrastructure;
-using Wuno.Domain.Rules;
 
 public sealed class GameServiceTests
 {
@@ -182,9 +178,9 @@ public sealed class GameServiceTests
 
         game.CurrentTurn = game.Turns[0];
         game.CurrentRound = game.Rounds[0];
-        await db.SaveChangesAsync();
         var gameId = game.Id;
         var turnId = game.Turns[0].Id;
+        await db.SaveChangesAsync();
 
         var state = await service.TimeoutAndAdvanceAsync(gameId, turnId, CancellationToken.None);
 
