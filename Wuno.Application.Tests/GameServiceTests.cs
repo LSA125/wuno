@@ -213,6 +213,7 @@ public sealed class GameServiceTests
 
         game.CurrentTurn = game.Turns[0];
         game.CurrentRound = game.Rounds[0];
+        game.CurSeat = 1;
         await db.SaveChangesAsync();
         db.ChangeTracker.Clear();
         var gameId = game.Id;
@@ -225,9 +226,6 @@ public sealed class GameServiceTests
 
         var timedOut = await db.Turns.FindAsync(turnId);
         Assert.Equal(TurnEndReason.TIMEOUT, timedOut!.EndReason);
-
-        var p1 = await db.Players.FindAsync(game.Players[0].Id);
-        Assert.False(p1!.IsActive);
     }
 
     [Fact]

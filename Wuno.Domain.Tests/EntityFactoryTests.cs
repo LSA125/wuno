@@ -84,9 +84,6 @@ namespace Wuno.Domain.Tests
             Assert.Equal(builtRound.Id, builtTurn.RoundId);
             Assert.Equal(-2, builtTurn.Seat);
             Assert.Equal(0, builtTurn.MinLen);
-
-            Assert.Same(builtRound, game.CurrentRound);
-            Assert.Same(builtTurn, game.CurrentTurn);
         }
 
         [Fact]

@@ -281,7 +281,7 @@ namespace Wuno.Application.Games.Implementation
                         Index = await _db.Rounds.CountAsync(r => r.GameId == game.Id, ct),
                         StartedAt = now
                     };
-
+                    _db.Rounds.Add(nextRound);
                     game.Rounds.Add(nextRound);
                     game.CurrentRound = nextRound;
 
@@ -548,7 +548,7 @@ namespace Wuno.Application.Games.Implementation
                         StartedAt = now
                     };
 
-                    game.Rounds.Add(nextRound);
+                    _db.Rounds.Add(nextRound);
                     game.CurrentRound = nextRound;
 
                     Player? firstPlayer = FindNextValidPlayer(game.Players, startSeat - 1)
