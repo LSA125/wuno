@@ -174,7 +174,7 @@ namespace Wuno.Application.Games.Implementation
                 {
                     GameId = game.Id,
                     RoundId = round.Id,
-                    Index = game.Turns.Count,
+                    Index = await _db.Turns.CountAsync(t => t.GameId == game.Id && t.RoundId == round.Id, ct),
                     Seat = nextPlayer.Seat,
                     FreeStart = applied.FreeStart,
                     MinLen = applied.MinLen,
@@ -278,7 +278,7 @@ namespace Wuno.Application.Games.Implementation
                     Round nextRound = new()
                     {
                         GameId = game.Id,
-                        Index = game.Rounds.Count,
+                        Index = await _db.Rounds.CountAsync(r => r.GameId == game.Id, ct),
                         StartedAt = now
                     };
 
@@ -544,7 +544,7 @@ namespace Wuno.Application.Games.Implementation
                     Round nextRound = new()
                     {
                         GameId = game.Id,
-                        Index = game.Rounds.Count,
+                        Index = await _db.Rounds.CountAsync(r => r.GameId == game.Id, ct),
                         StartedAt = now
                     };
 

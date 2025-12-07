@@ -180,7 +180,6 @@ public sealed class GameServiceTests
         game.CurrentRound = game.Rounds[0];
         var gameId = game.Id;
         var turnId = game.Turns[0].Id;
-        await db.SaveChangesAsync();
 
         var state = await service.TimeoutAndAdvanceAsync(gameId, turnId, CancellationToken.None);
 
