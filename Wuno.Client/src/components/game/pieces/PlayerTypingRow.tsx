@@ -10,30 +10,30 @@ type PlayerTypingRowProps = {
 export default function PlayerTypingRow({ player, typed, isActiveSeat, isViewer }: PlayerTypingRowProps) {
     const typedPreview = typed?.trim() || player.lastWord || "";
     const disconnected = !player.isConnected;
-    const inactiveClass = player.isActive ? "" : "opacity-60";
-    const activeSeatClass = isActiveSeat ? "border-primary bg-body-tertiary" : "border-transparent";
+    const inactive = !player.isActive;
     return (
         <li
-            className={`py-3 px-3 flex gap-3 items-center rounded border ${inactiveClass} ${activeSeatClass}`}
+            className={`player-row px-3 py-3 d-flex gap-3 align-items-start ${isActiveSeat ? "current-turn" : ""} ${inactive ? "faded" : ""}`}
             style={isViewer ? { boxShadow: "0 0 0 2px rgba(13,110,253,.3)" } : undefined}
         >
-            <img src={player.iconUrl || "/avatar.svg"} className="w-10 h-10 rounded-full border" />
+            <img
+                src={player.iconUrl || "/avatar.svg"}
+                className="rounded-circle border flex-shrink-0"
+                width={44}
+                height={44}
+                alt={player.name || "Player avatar"}
+            />
 
             <div className="flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                    <div className="font-semibold leading-tight">
-                        {player.name || `Seat ${player.seat}`}
-                    </div>
+                <div className="d-flex flex-wrap align-items-center gap-2">
+                    <div className="fw-semibold leading-tight">{player.name || `Seat ${player.seat}`}</div>
                     {isViewer && <span className="badge text-bg-info text-uppercase">You</span>}
+                    {isActiveSeat && <span className="badge text-bg-primary text-uppercase">Current</span>}
                     {disconnected && <DisconnectPill />}
                 </div>
                 <div className="text-xs opacity-70">Seat {player.seat} · Wins: {player.roundWins}</div>
                 <div className="mt-2 font-mono text-sm tracking-wide" aria-live={isActiveSeat ? "polite" : "off"}>
-                    {typedPreview ? (
-                        <span className="uppercase">{typedPreview}</span>
-                    ) : (
-                        <span className="opacity-60">Waiting…</span>
-                    )}
+                    {typedPreview ? <span className="uppercase">{typedPreview}</span> : <span className="opacity-60">Waiting…</span>}
                 </div>
             </div>
 

@@ -1,88 +1,85 @@
+import { useMemo } from "react";
+
 export type RestrictionTrackProps = {
     minLen: number;
     typedWord: string;
     previousWord?: string | null;
     startLetter: string | null;
     freeStart: boolean;
+    reverseMatchLength: number;
+    invalid?: boolean;
+    requiredWords: number;
 };
 
-export default function RestrictionTrack({ minLen, typedWord, previousWord, startLetter, freeStart }: RestrictionTrackProps) {
-    const upperTyped = (typedWord || "").toUpperCase();
-    const upperPrev = (previousWord || "").toUpperCase();
-    const requirementLetter = !freeStart && startLetter ? startLetter.toUpperCase() : null;
-    const boxCount = Math.max(minLen, upperTyped.length, upperPrev.length || 0);
+const normalizeWord = (word: string) =>
+    word
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toUpperCase()
+        .replace(/[^A-Z]/g, "");
 
-    const ready = upperTyped.length >= minLen && (requirementLetter ? upperTyped.startsWith(requirementLetter) : true);
+export default function RestrictionTrack({
+    minLen,
+    typedWord,
+    previousWord,
+    startLetter,
+    freeStart,
+    reverseMatchLength,
+    invalid = false,
+    requiredWords,
+}: RestrictionTrackProps) {
+    const typed = normalizeWord(typedWord || "");
+    const prev = normalizeWord(previousWord || "");
+    const reversedPrev = useMemo(() => prev.split("").reverse(), [prev]);
+    const totalBoxes = Math.max(minLen, typed.length, reversedPrev.length || 0, 4);
 
-    return (
-        <div className="restriction-track" data-sound-ready={ready ? "true" : undefined}>
-            <div className="flex flex-wrap gap-2" role="list" aria-label="Restriction track">
-                {Array.from({ length: boxCount }).map((_, idx) => {
-                    const typedChar = upperTyped[idx];
-                    const prevChar = upperPrev[idx];
-                    const matchesPrev = Boolean(typedChar && prevChar && typedChar === prevChar);
-                    const needsLetter = !freeStart && idx === 0 && requirementLetter;
-                    const unmetRequirement = needsLetter && typedChar !== requirementLetter;
-                    const pending = !typedChar && idx < minLen;
-                    return (
-                        <LetterBox
-                            key={idx}
-                            index={idx}
-                            typed={typedChar}
-                            prev={prevChar}
-                            matchesPrev={matchesPrev}
-                            pending={pending}
-                            unmetRequirement={!!unmetRequirement}
-                            requirementLetter={needsLetter ? requirementLetter || undefined : undefined}
-                        />
-                    );
-                })}
-            </div>
-            <div className="mt-2 text-xs text-muted">
-                {freeStart ? "Free start" : `Must start with “${(startLetter ?? "").toUpperCase()}”`}
-                {ready ? " · Ready to submit" : ""}
-            </div>
-        </div>
-    );
-}
-
-type LetterBoxProps = {
-    index: number;
-    typed?: string;
-    prev?: string;
-    matchesPrev: boolean;
-    pending: boolean;
-    unmetRequirement: boolean;
-    requirementLetter?: string;
-};
-
-function LetterBox({ index, typed, prev, matchesPrev, pending, unmetRequirement, requirementLetter }: LetterBoxProps) {
-    const baseClass = "w-10 h-14 rounded border flex flex-col items-center justify-center text-sm font-semibold";
-    let stateClass = "bg-white";
-    if (matchesPrev) {
-        stateClass = "bg-success-subtle border-success text-success";
-    } else if (typed) {
-        stateClass = "bg-primary-subtle border-primary text-primary";
-    } else if (pending) {
-        stateClass = "bg-body-tertiary border-dashed";
-    }
-    if (unmetRequirement) {
-        stateClass = "bg-warning-subtle border-warning text-warning";
-    }
+    const ready = typed.length >= minLen && (freeStart || (startLetter ? typed.startsWith(normalizeWord(startLetter)) : true));
 
     return (
-        <div
-            className={`${baseClass} ${stateClass}`}
-            data-letter-index={index}
-            data-sound-event={matchesPrev ? "match" : undefined}
-            aria-live="polite"
-        >
-            <span>{typed || requirementLetter || ""}</span>
-            {!typed && prev && (
-                <span className="opacity-60" style={{ fontSize: "0.65rem" }}>
-                    {prev}
-                </span>
-            )}
+        <div className={`restriction-track card border-0 shadow-sm ${invalid ? "shake" : ""}`}>
+            <div className="card-body">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                    <div>
+                        <p className="text-uppercase text-muted small mb-1">Chain requirement</p>
+                        <h6 className="mb-0">Match the reverse of the previous word</h6>
+                    </div>
+                    <span className={`badge ${ready ? "text-bg-success" : "text-bg-warning"}`}>
+                        {ready ? "Ready to submit" : "Keep typing"}
+                    </span>
+                </div>
+                <div className="letter-track" role="list" aria-label="Reverse chain tracker">
+                    {Array.from({ length: totalBoxes }).map((_, idx) => {
+                        const typedChar = typed[idx];
+                        const prevChar = reversedPrev[idx];
+                        const requirementLetter = !freeStart && idx === 0 && startLetter ? startLetter.toUpperCase() : "";
+                        const matchesReverse = idx < reverseMatchLength && Boolean(prevChar);
+                        const pending = !typedChar && idx < minLen;
+                        const unmetRequirement = requirementLetter && typedChar && typedChar !== requirementLetter;
+                        const active = typedChar || prevChar || requirementLetter;
+                        let stateClass = "letter-box";
+                        if (matchesReverse) stateClass += " match";
+                        else if (unmetRequirement) stateClass += " warn";
+                        else if (typedChar) stateClass += " typed";
+                        else if (pending) stateClass += " pending";
+                        else if (active) stateClass += " ghost";
+
+                        return (
+                            <div key={idx} className={stateClass} data-letter-index={idx} aria-label={`Letter slot ${idx + 1}`}>
+                                <span className="letter-main">{typedChar || requirementLetter || prevChar || "Â·"}</span>
+                                {prevChar && <span className="letter-hint">{prevChar}</span>}
+                            </div>
+                        );
+                    })}
+                </div>
+
+                <div className="d-flex flex-wrap gap-3 mt-3 text-muted small">
+                    <span>{freeStart ? "Free start â€” ignore the first letter" : `Must start with ${startLetter?.toUpperCase() || "?"}`}</span>
+                    <span className="dot" aria-hidden="true" />
+                    <span>Matching boxes light up as you mirror the previous word.</span>
+                    <span className="dot" aria-hidden="true" />
+                    <span>Need at least {requiredWords} letters before submitting.</span>
+                </div>
+            </div>
         </div>
     );
 }

@@ -170,10 +170,6 @@ export default function GamePage() {
     };
     }, [code, myUserId, nav, push]);
 
-    const mePlayer = useMemo(
-    () => state?.players.find(p => p.playerId === mePlayerId) ?? null,
-    [state, mePlayerId]
-    );
 
     // Ready toggle
     const setReady = async (ready: boolean) => {
@@ -190,18 +186,18 @@ export default function GamePage() {
 
     // Submit a word
     const submitWord = async (word: string) => {
-    if (!hubRef.current || !state || meSeat == null) return;
-    try {
-        await hubRef.current.invoke(
-        "SubmitWord",
-        state.gameId,
-        state.currentRound.roundId,
-        state.currentTurn.turnId,
-        word
-        );
-    } catch (e) {
-        console.error(e);
-    }
+        if (!hubRef.current || !state || meSeat == null || !state.currentRound || !state.currentTurn) return;
+        try {
+            await hubRef.current.invoke(
+                "SubmitWord",
+                state.gameId,
+                state.currentRound.roundId,
+                state.currentTurn.turnId,
+                word
+            );
+        } catch (e) {
+            console.error(e);
+        }
     };
 
     // Broadcast local typing
@@ -292,13 +288,15 @@ export default function GamePage() {
 function deriveEffectChips(prev: TurnState | null, next: TurnState | null, push: (chips: string[]) => void) {
     if (!prev || !next) return;
     const chips: string[] = [];
+    const prevDuration = Math.round((new Date(prev.dueAt).getTime() - new Date(prev.startedAt).getTime()) / 1000);
+    const nextDuration = Math.round((new Date(next.dueAt).getTime() - new Date(next.startedAt).getTime()) / 1000);
     if (next.seat !== prev.seat) {
-    // Compare constraints the *new* player got vs the previous turn we saw for any player
-    if (next.durationSec > prev.durationSec) chips.push(`+${next.durationSec - prev.durationSec}s Time`);
-    if (next.durationSec < prev.durationSec) chips.push(`-${prev.durationSec - next.durationSec}s Time`);
-    if (next.minLen > prev.minLen) chips.push(`Opponent Min +${next.minLen - prev.minLen}`);
-    if (next.minLen < prev.minLen) chips.push(`Min -${prev.minLen - next.minLen}`);
-    if (next.freeStart && !prev.freeStart) chips.push("Free Start");
+        // Compare constraints the *new* player got vs the previous turn we saw for any player
+        if (nextDuration > prevDuration) chips.push(`+${nextDuration - prevDuration}s Time`);
+        if (nextDuration < prevDuration) chips.push(`-${prevDuration - nextDuration}s Time`);
+        if (next.minLen > prev.minLen) chips.push(`Opponent Min +${next.minLen - prev.minLen}`);
+        if (next.minLen < prev.minLen) chips.push(`Min -${prev.minLen - next.minLen}`);
+        if (next.freeStart && !prev.freeStart) chips.push("Free Start");
     }
     if (chips.length) push(chips);
 }

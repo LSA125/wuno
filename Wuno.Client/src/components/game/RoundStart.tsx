@@ -10,7 +10,9 @@ export default function RoundStart({
     msRemaining: number;
 }) {
     const top = [...players].sort((a, b) => b.roundWins - a.roundWins).slice(0, 3);
-
+    const totalWindow = 3000;
+    const pct = Math.max(0, Math.min(100, 100 - (msRemaining / totalWindow) * 100));
+    const seconds = (msRemaining / 1000).toFixed(1);
     return (
         <section className="grid md:grid-cols-2 gap-4 items-stretch">
             <div className="card shadow">
@@ -38,13 +40,16 @@ export default function RoundStart({
                 </div>
             </div>
 
-            <div className="card shadow flex items-center justify-center">
-                <div className="card-body flex items-center justify-center">
-                    <div className="text-center">
-                        <div className="text-2xl font-bold mb-2">Next round starts in</div>
-                        <div className="text-6xl font-black tracking-tight">{(msRemaining / 1000).toFixed(1)}s</div>
-                        <div className="mt-3 text-muted">Get ready!</div>
+            <div className="card shadow flex items-center justify-center gradient-card">
+                <div className="card-body flex flex-col items-center justify-center text-center gap-3">
+                    <div className="text-uppercase text-muted small">Quick start</div>
+                    <div className="display-5 fw-bold">{seconds}s</div>
+                    <div className="w-100" aria-label="Round starting timer">
+                        <div className="progress" style={{ height: 10 }}>
+                            <div className="progress-bar progress-bar-striped progress-bar-animated" style={{ width: `${pct}%` }} />
+                        </div>
                     </div>
+                    <p className="mb-0">Everyone is ready — the next word chain is about to start.</p>
                 </div>
             </div>
         </section>
