@@ -37,7 +37,23 @@ namespace Wuno.Testing.Builders
         public Turn Build()
         {
             var gameRef = _game ?? new Game { Id = _gameId };
-            var roundRef = _round ?? new Round { Id = _roundId, GameId = _gameId, Game = gameRef };
+            var roundRef = _round
+                ?? gameRef.Rounds.FirstOrDefault(r => r.Id == _roundId)
+                ?? gameRef.CurrentRound
+                ?? gameRef.Rounds.FirstOrDefault();
+
+            if (roundRef is null)
+            {
+                roundRef = new Round { Id = _roundId, GameId = _gameId, Game = gameRef };
+            }
+            else
+            {
+                _roundId = roundRef.Id;
+                _gameId = roundRef.GameId == default ? _gameId : roundRef.GameId;
+
+                roundRef.GameId = _gameId;
+                roundRef.Game = gameRef;
+            }
 
             return new Turn
             {
