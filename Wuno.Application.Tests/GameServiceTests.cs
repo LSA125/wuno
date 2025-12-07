@@ -157,6 +157,39 @@ public sealed class GameServiceTests
         var playerOne = await db.Players.FindAsync(game.Players[0].Id);
         Assert.Equal("alpha", playerOne!.LastWord);
     }
+    [Fact]
+    public async Task ProcessTurnAsync_rejects_overdue_submition_with_timeout()
+    {
+        var factory = new SqliteInMemoryAppDbContextFactory();
+        var past = DateTime.UtcNow.AddSeconds(-5);
+
+        var game = new GameBuilder()
+            .WithStatus(GameStatus.ACTIVE)
+            .AddPlayer(new PlayerBuilder().AtSeat(1))
+            .AddPlayer(new PlayerBuilder().AtSeat(2))
+            .AddRound(new RoundBuilder().WithIndex(0))
+            .AddTurn(new TurnBuilder().WithIndex(0).AtSeat(1).DueAt(past).StartedAt(past.AddSeconds(-10)))
+            .CurrentSeat(1)
+        .Build();
+
+        using var db = factory.CreateContext(ctx => ctx.Add(game));
+        var service = CreateService(db);
+
+        game.CurrentTurn = game.Turns[0];
+        game.CurrentRound = game.Rounds[0];
+        var turnId = game.Turns[0].Id;
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+
+        var result = await service.ProcessTurnAsync(game.Id, game.Rounds[0].Id, game.Turns[0].Id, game.Players[0].Id, 1, "alpha", CancellationToken.None);
+
+        var turnReason = await db.Turns.FindAsync(turnId);
+        Assert.Equal(TurnEndReason.TIMEOUT, turnReason!.EndReason);
+
+        Assert.True(result.Ok);
+        Assert.NotNull(result.State);
+        Assert.NotEqual(result.State.CurrentTurn!.TurnId, turnId);
+    }
 
     [Fact]
     public async Task TimeoutAndAdvanceAsync_marks_player_inactive_and_creates_next_turn()
@@ -178,6 +211,8 @@ public sealed class GameServiceTests
 
         game.CurrentTurn = game.Turns[0];
         game.CurrentRound = game.Rounds[0];
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
         var gameId = game.Id;
         var turnId = game.Turns[0].Id;
 
