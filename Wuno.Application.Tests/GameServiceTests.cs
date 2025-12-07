@@ -147,6 +147,8 @@ public sealed class GameServiceTests
         var service = CreateService(db);
         game.CurrentTurn = game.Turns[0];
         game.CurrentRound = game.Rounds[0];
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
 
 
         var result = await service.ProcessTurnAsync(game.Id, game.Rounds[0].Id, game.Turns[0].Id, game.Players[0].Id, 1, "alpha", CancellationToken.None);
