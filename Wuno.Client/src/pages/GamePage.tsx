@@ -27,8 +27,8 @@ export default function GamePage() {
     const [effectsFlash, setEffectsFlash] = useState<string[]>([]); // derived effect chips
     const { push } = useToast();
 
-    // For “diffing” turn changes → create animated effect chips
     const lastTurnRef = useRef<TurnState | null>(null);
+    const lastRoundRef = useRef<string | null>(null);
 
     const myUserId = useMemo(() => {
         return (user?.userId as string | undefined) || getCookie() || "";
@@ -84,7 +84,9 @@ export default function GamePage() {
             setState(res.state);
             const seat = res.state.players.find(p => p.playerId === res.playerId)?.seat ?? null;
             setMeSeat(seat);
-            setPhase(res.state.status === 0 ? "waiting" : "playing"); // GameStatus.WAITING==0, ACTIVE==1, FINISHED==2
+            lastTurnRef.current = res.state.currentTurn ?? null;
+            lastRoundRef.current = res.state.currentRound?.roundId ?? null;
+            setPhase(derivePhaseFromGame(res.state));
         });
 
             hub.on("ConnectionFailed", (msg: string) => {
@@ -106,9 +108,7 @@ export default function GamePage() {
         });
 
         hub.on("MatchStarted", (g: GameState) => {
-            if (cancelled) return;
-            setState(g);
-            setPhase("playing");
+
         });
 
         hub.on("GameUpdated", (g: GameState) => {
@@ -117,15 +117,11 @@ export default function GamePage() {
             deriveEffectChips(lastTurnRef.current, g.currentTurn, setEffectsFlash);
             lastTurnRef.current = g.currentTurn;
             setState(g);
+            setPhase(derivePhaseFromGame(g));
+            if (g.status !== 0) setRoundCountdownMs(null);
         });
 
-        hub.on("NewRoundStarted", (g: GameState) => {
-            if (cancelled) return;
-            setTypedBySeat({});
-            setEffectsFlash([]);
-            setState(g);
-            setPhase("playing");
-        });
+        hub.on("NewRoundStarted", () => { });
 
         hub.on("RoundEnded", (g: GameState) => {
             if (cancelled) return;
@@ -283,6 +279,14 @@ export default function GamePage() {
         </div>
     );
 }
+
+function derivePhaseFromGame(g: GameState): Phase {
+    if (g.status === 2) return "ended"; // GameStatus.FINISHED
+    if (g.status === 0) return "waiting"; // GameStatus.WAITING
+    if (g.currentTurn || g.currentRound) return "playing";
+    return "round-start";
+}
+
 
 /** Derive simple “effect chips” (for animation) by diffing consecutive turns. */
 function deriveEffectChips(prev: TurnState | null, next: TurnState | null, push: (chips: string[]) => void) {

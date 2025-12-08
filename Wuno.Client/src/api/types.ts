@@ -44,8 +44,8 @@ export type GameState = {
     direction: number;
     targetWins: number;
     players: PlayerState[];
-    currentRound?: RoundState | null;
-    currentTurn?: TurnState | null;
+    currentRound: RoundState | null;
+    currentTurn: TurnState | null;
 };
 export type JoinGameResponse = { playerId: string; state: GameState };
 export type SubmitWordResponse = { ok: boolean; reason?: string };
