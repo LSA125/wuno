@@ -19,7 +19,7 @@ public sealed class TurnTimerTests
         serviceCollection.AddSingleton<IGameService>(new StubGameService((g, t) =>
         {
             calls.Add((g, t));
-            return Task.FromResult<GameState?>(new GameState(g, GameStatus.ACTIVE, 1, 1, 1, new(), new(Guid.NewGuid(), 0, null, DateTime.UtcNow, null), new(Guid.NewGuid(), 0, 1, DateTime.UtcNow, DateTime.UtcNow.AddSeconds(10), 1, true, new())));
+            return Task.FromResult<GameState?>(new GameState(g, GameStatus.ACTIVE, 1, 1, 1, null, new(), new(Guid.NewGuid(), 0, null, DateTime.UtcNow, null), new(Guid.NewGuid(), 0, 1, DateTime.UtcNow, DateTime.UtcNow.AddSeconds(10), 1, true, new())));
         }));
         var provider = serviceCollection.BuildServiceProvider();
 
@@ -114,8 +114,7 @@ public sealed class TurnTimerTests
 
         public Task<List<PlayerState>> GetPlayersAsync(Guid gameId, CancellationToken ct) => Task.FromResult(new List<PlayerState>());
 
-        public Task<GameState> GetGameStateAsync(Guid gameId, CancellationToken ct) => Task.FromResult(new GameState(Guid.Empty, GameStatus.WAITING, 0, 1, 1, new(), new(Guid.Empty, 0, null, null, null), new(Guid.Empty, 0, 0, DateTime.UtcNow, DateTime.UtcNow, 0, false, new())));
-
+        public Task<GameState> GetGameStateAsync(Guid gameId, CancellationToken ct) => Task.FromResult(new GameState(Guid.Empty, GameStatus.WAITING, 0, 1, 1, null, new(), new(Guid.Empty, 0, null, null, null), new(Guid.Empty, 0, 0, DateTime.UtcNow, DateTime.UtcNow, 0, false, new())));
         public Task<int> GetCurrentSeatAsync(Guid gameId, CancellationToken ct) => Task.FromResult(0);
 
         public Task<GameState?> TimeoutAndAdvanceAsync(Guid gameId, Guid turnId, CancellationToken ct) => _timeout(gameId, turnId);

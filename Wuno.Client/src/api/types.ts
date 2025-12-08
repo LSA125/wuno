@@ -43,6 +43,7 @@ export type GameState = {
     nextSeat: number;
     direction: number;
     targetWins: number;
+    lastWord?: string | null;
     players: PlayerState[];
     currentRound: RoundState | null;
     currentTurn: TurnState | null;

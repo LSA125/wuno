@@ -41,7 +41,7 @@ export default function RestrictionTrack({
                 <div className="d-flex justify-content-between align-items-center mb-2">
                     <div>
                         <p className="text-uppercase text-muted small mb-1">Chain requirement</p>
-                        <h6 className="mb-0">Match the reverse of the previous word</h6>
+                        <h6 className="mb-0">Match the reverse of the last played word</h6>
                     </div>
                     <span className={`badge ${ready ? "text-bg-success" : "text-bg-warning"}`}>
                         {ready ? "Ready to submit" : "Keep typing"}
@@ -75,7 +75,7 @@ export default function RestrictionTrack({
                 <div className="d-flex flex-wrap gap-3 mt-3 text-muted small">
                     <span>{freeStart ? "Free start — ignore the first letter" : `Must start with ${startLetter?.toUpperCase() || "?"}`}</span>
                     <span className="dot" aria-hidden="true" />
-                    <span>Matching boxes light up as you mirror the previous word.</span>
+                    <span>Matching boxes light up as you mirror the last played word.</span>
                     <span className="dot" aria-hidden="true" />
                     <span>Need at least {requiredWords} letters before submitting.</span>
                 </div>

@@ -3,7 +3,6 @@ import PlayerTypingRow from "./pieces/PlayerTypingRow";
 
 export type PlayerSidebarProps = {
     players: PlayerState[];
-    typedBySeat: Record<number, string>;
     currentSeat?: number | null;
     meSeat: number;
 };

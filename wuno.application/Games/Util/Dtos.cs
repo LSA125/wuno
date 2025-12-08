@@ -22,6 +22,5 @@ namespace Wuno.Application.Games.Util
     public record PlayerState(Guid PlayerId, int Seat, bool IsActive, bool IsConnected, string Name, string? IconUrl, int RoundWins, string? LastWord);
     public record TurnState(Guid TurnId,int Index, int Seat, DateTime StartedAt, DateTime DueAt, int MinLen, bool FreeStart, List<EffectState> Effects);
     public record RoundState(Guid RoundId, int Index, Guid? WinnerId, DateTime? StartedAt, DateTime? EndedAt);
-    public record GameState(Guid GameId, GameStatus Status, int NextSeat, int Direction, int TargetWins, List<PlayerState> Players, RoundState? CurrentRound, TurnState? CurrentTurn);
-    public record ProcessTurnOutcome(bool Ok, string? Reason, GameState? State);
+    public record GameState(Guid GameId, GameStatus Status, int NextSeat, int Direction, int TargetWins, string? LastWord, List<PlayerState> Players, RoundState? CurrentRound, TurnState? CurrentTurn); public record ProcessTurnOutcome(bool Ok, string? Reason, GameState? State);
 }

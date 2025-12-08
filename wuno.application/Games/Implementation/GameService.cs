@@ -352,7 +352,16 @@ namespace Wuno.Application.Games.Implementation
             }
             else
             {
-                return new GameState(game.Id, game.Status, game.CurSeat, game.TargetWins, 0, players, null, null);
+                return new GameState(
+                    game.Id,
+                    game.Status,
+                    game.CurSeat,
+                    game.Direction,
+                    game.TargetWins,
+                    game.LastWord,
+                    players,
+                    null,
+                    null);
             }
         }
         public async Task<GameCodeResponse> GetUserActiveGameCodeAsync(Guid userId, CancellationToken ct)

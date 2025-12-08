@@ -46,9 +46,9 @@ namespace Wuno.Application.Games.Util
                 player.LastWord
             );
         }
-        public static GameState GameToState(Game game, 
-            List<PlayerState> players, 
-            RoundState currentRound, 
+        public static GameState GameToState(Game game,
+            List<PlayerState> players,
+            RoundState currentRound,
             TurnState currentTurn)
         {
             return new GameState(
@@ -57,6 +57,7 @@ namespace Wuno.Application.Games.Util
                 game.CurSeat,
                 game.Direction,
                 game.TargetWins,
+                game.LastWord,
                 players,
                 currentRound,
                 currentTurn

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
-import type { GameState, JoinGameResponse, PlayerState, TurnState } from "@/api/types";
+import type { GameState, JoinGameResponse, PlayerState } from "@/api/types";
 import { getCookie } from "@/auth/cookies";
 import WaitingRoom from "@/components/game/WaitingRoom";
 import RoundStart from "@/components/game/RoundStart";
@@ -24,10 +24,8 @@ export default function GamePage() {
     const [phase, setPhase] = useState<Phase>("waiting");
     const [roundCountdownMs, setRoundCountdownMs] = useState<number | null>(null);
     const [typedBySeat, setTypedBySeat] = useState<Record<number, string>>({});
-    const [effectsFlash, setEffectsFlash] = useState<string[]>([]); // derived effect chips
     const { push } = useToast();
 
-    const lastTurnRef = useRef<TurnState | null>(null);
     const lastRoundRef = useRef<string | null>(null);
 
     const myUserId = useMemo(() => {
@@ -49,6 +47,17 @@ export default function GamePage() {
         } finally {
             try { await hubRef.current.stop(); } catch { }
             nav("/lobby", { replace: true });
+        }
+    };
+    const copyLink = async () => {
+        if (!code) return;
+
+        try {
+            await navigator.clipboard.writeText(window.location.href);
+            push("Game link copied");
+        } catch (err) {
+            console.error("Copy failed", err);
+            push("Couldn't copy the link. Try manually copying the address bar.");
         }
     };
     useEffect(() => {
@@ -84,7 +93,6 @@ export default function GamePage() {
             setState(res.state);
             const seat = res.state.players.find(p => p.playerId === res.playerId)?.seat ?? null;
             setMeSeat(seat);
-            lastTurnRef.current = res.state.currentTurn ?? null;
             lastRoundRef.current = res.state.currentRound?.roundId ?? null;
             setPhase(derivePhaseFromGame(res.state));
         });
@@ -113,9 +121,6 @@ export default function GamePage() {
 
         hub.on("GameUpdated", (g: GameState) => {
             if (cancelled) return;
-            // derive simple effect chips based on previous vs new currentTurn
-            deriveEffectChips(lastTurnRef.current, g.currentTurn, setEffectsFlash);
-            lastTurnRef.current = g.currentTurn;
             setState(g);
             setPhase(derivePhaseFromGame(g));
             if (g.status !== 0) setRoundCountdownMs(null);
@@ -227,10 +232,17 @@ export default function GamePage() {
     return (
         <div className="container mx-auto px-3 py-6">
             {/* Top layout bar with code + Leave */}
-            <div className="mb-4 flex items-center justify-between">
-                <div className="text-sm opacity-70">
+            <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm opacity-70">
                     <span className="font-semibold">Game</span>{" "}
                     <span className="opacity-80">#{(code ?? "").toUpperCase()}</span>
+                    <button
+                        type="button"
+                        className="btn btn-outline-primary btn-sm"
+                        onClick={copyLink}
+                    >
+                        Copy link
+                    </button>
                 </div>
                 {!inLivePhase && (
                     <button
@@ -271,7 +283,6 @@ export default function GamePage() {
                     onSubmit={submitWord}
                     onLeave={leaveGame}
                     canLeave={!!hubRef.current && hubRef.current.state === "Connected"}
-                    effectsFlash={effectsFlash}
                     ended={phase === "ended"}
                     currentTurn={state.currentTurn ?? null}
                 />
@@ -285,22 +296,4 @@ function derivePhaseFromGame(g: GameState): Phase {
     if (g.status === 0) return "waiting"; // GameStatus.WAITING
     if (g.currentTurn || g.currentRound) return "playing";
     return "round-start";
-}
-
-
-/** Derive simple “effect chips” (for animation) by diffing consecutive turns. */
-function deriveEffectChips(prev: TurnState | null, next: TurnState | null, push: (chips: string[]) => void) {
-    if (!prev || !next) return;
-    const chips: string[] = [];
-    const prevDuration = Math.round((new Date(prev.dueAt).getTime() - new Date(prev.startedAt).getTime()) / 1000);
-    const nextDuration = Math.round((new Date(next.dueAt).getTime() - new Date(next.startedAt).getTime()) / 1000);
-    if (next.seat !== prev.seat) {
-        // Compare constraints the *new* player got vs the previous turn we saw for any player
-        if (nextDuration > prevDuration) chips.push(`+${nextDuration - prevDuration}s Time`);
-        if (nextDuration < prevDuration) chips.push(`-${prevDuration - nextDuration}s Time`);
-        if (next.minLen > prev.minLen) chips.push(`Opponent Min +${next.minLen - prev.minLen}`);
-        if (next.minLen < prev.minLen) chips.push(`Min -${prev.minLen - next.minLen}`);
-        if (next.freeStart && !prev.freeStart) chips.push("Free Start");
-    }
-    if (chips.length) push(chips);
 }

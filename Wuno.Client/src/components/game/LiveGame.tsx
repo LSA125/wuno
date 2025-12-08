@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import type { GameState, TurnState } from "@/api/types";
+import type { EffectState, GameState, TurnState } from "@/api/types";
 import EffectChip from "./pieces/EffectChip";
 import RequiredLengthGauge from "./pieces/RequiredLengthGauge";
 import PlayerSidebar from "./PlayerSidebar";
 import RestrictionTrack from "./pieces/RestrictionTrack";
+import { EffectType } from "./pieces/effectTypes";
 const normalizeWord = (word: string) =>
     word
         .normalize("NFD")
@@ -26,10 +27,10 @@ type LiveGameProps = {
     onSubmit: (word: string) => void;
     onLeave: () => void;
     canLeave?: boolean;
-    effectsFlash: string[];
     ended: boolean;
     currentTurn: TurnState | null;
 };
+type EffectEvent = EffectState & { id: number };
 export default function LiveGame({
     state,
     meSeat,
@@ -38,7 +39,6 @@ export default function LiveGame({
     onSubmit,
     onLeave,
     canLeave = true,
-    effectsFlash,
     ended,
     currentTurn,
 }: LiveGameProps) {
@@ -49,7 +49,10 @@ export default function LiveGame({
     const [invalidReason, setInvalidReason] = useState<string | null>(null);
     const [shake, setShake] = useState(false);
     const [wordHistory, setWordHistory] = useState<Set<string>>(new Set());
+    const [effectEvents, setEffectEvents] = useState<EffectEvent[]>([]);
     const lastMatchRef = useRef(0);
+    const lastTurnIdRef = useRef<string | null>(null);
+    const lastEffectCountRef = useRef(0);
     const audioRef = useRef<AudioContext | null>(null);
 
     useEffect(() => {
@@ -64,8 +67,32 @@ export default function LiveGame({
         lastMatchRef.current = 0;
     }, [players, state.currentRound?.roundId, turn?.turnId]);
 
+    useEffect(() => {
+        if (!turn) {
+            setEffectEvents([]);
+            lastEffectCountRef.current = 0;
+            lastTurnIdRef.current = null;
+            return;
+        }
+
+        const sameTurn = lastTurnIdRef.current === turn.turnId;
+        const baseline = sameTurn ? lastEffectCountRef.current : 0;
+        const newEffects = turn.effects.slice(baseline);
+
+        newEffects.forEach((effect, idx) => {
+            const id = Number(`${Date.now()}${idx}`);
+            setEffectEvents((prev) => [...prev, { ...effect, id }]);
+            setTimeout(() => {
+                setEffectEvents((prev) => prev.filter((e) => e.id !== id));
+            }, 2000);
+        });
+
+        lastTurnIdRef.current = turn.turnId;
+        lastEffectCountRef.current = turn.effects.length;
+    }, [turn]);
+
     const currentPlayer = players.find((p) => p.seat === turn?.seat);
-    const previousWord = currentPlayer?.lastWord ?? "";
+    const previousWord = state.lastWord ?? currentPlayer?.lastWord ?? "";
     const reversedPrevious = reverseString(normalizeWord(previousWord));
     const normalizedInput = normalizeWord(input);
     const reverseMatchLength = computeReverseMatchLength(normalizedInput, reversedPrevious);
@@ -152,7 +179,9 @@ export default function LiveGame({
 
     const activeTyped = typedBySeat[turn.seat] ?? (myTurn ? input : "");
     const totalLettersNeeded = minLen;
-
+    const timerEffects = effectEvents.filter((e) => e.type === EffectType.ADD_TIME);
+    const lengthEffects = effectEvents.filter((e) => e.type === EffectType.ADJ_MIN_LEN);
+    const freeStartEffects = effectEvents.filter((e) => e.type === EffectType.FREE_START);
 
     if (ended) {
         const winner = [...players].sort((a, b) => b.roundWins - a.roundWins)[0];
@@ -173,19 +202,21 @@ export default function LiveGame({
     return (
         <section className="game-layout">
             <div className="game-panel" data-sound-turn={myTurn ? "active" : undefined}>
-                <div className="effects-stack">
-                    {effectsFlash.map((e, i) => (
-                        <EffectChip key={i} label={e} />
-                    ))}
-                </div>
 
                 <div className="d-flex flex-wrap justify-content-between align-items-start gap-3">
                     <div>
                         <p className="text-uppercase text-muted small mb-1">Round {roundIndex}</p>
                         <h4 className="mb-0">Turn #{turn.index + 1} · Seat {turn.seat}</h4>
                     </div>
-                    <div className="d-flex gap-2 align-items-center">
-                        <span className="badge text-bg-primary">Need {totalLettersNeeded} letters</span>
+                    <div className="d-flex gap-2 align-items-center position-relative">
+                        <span className={`badge text-bg-primary ${lengthEffects.length ? "length-pulse" : ""}`}>
+                            Need {totalLettersNeeded} letters
+                        </span>
+                        {lengthEffects.length > 0 && (
+                            <div className="inline-effect-chip" aria-live="polite">
+                                <EffectChip effect={lengthEffects[lengthEffects.length - 1]} subtle />
+                            </div>
+                        )}
                         <button type="button" className="btn btn-outline-danger" onClick={onLeave} disabled={!canLeave}>
                             Leave game
                         </button>
@@ -224,7 +255,7 @@ export default function LiveGame({
                             <span className="badge text-bg-primary">Current turn</span>
                         </div>
                     </div>
-                    <TurnTimer startedAt={turn.startedAt} dueAt={turn.dueAt} />
+                    <TurnTimer startedAt={turn.startedAt} dueAt={turn.dueAt} effects={timerEffects} />
                     <RestrictionTrack
                         minLen={minLen}
                         typedWord={activeTyped || ""}
@@ -272,8 +303,12 @@ export default function LiveGame({
                                             ? "Press Enter or hit Submit once the chain checks out."
                                             : "Stay tuned — you’re up soon."}
                                 </span>
-                                <span className="badge text-bg-light">{turn.freeStart ? "Free start" : "Chain play"}</span>
-                            </div>
+                                <span className={`badge text-bg-light ${freeStartEffects.length ? "free-flash" : ""}`}>
+                                    {turn.freeStart ? "Free start" : "Chain play"}
+                                </span>
+                                {freeStartEffects.length > 0 && (
+                                    <EffectChip effect={freeStartEffects[freeStartEffects.length - 1]} subtle />
+                                )}                            </div>
                         </div>
                     </div>
                 </div>
@@ -282,8 +317,15 @@ export default function LiveGame({
     );
 }
 
-function TurnTimer({ startedAt, dueAt }: { startedAt: string; dueAt: string }) {
-    const [ms, setMs] = useState<number>(() => Math.max(0, new Date(dueAt).getTime() - Date.now()));
+function TurnTimer({
+    startedAt,
+    dueAt,
+    effects,
+}: {
+    startedAt: string;
+    dueAt: string;
+    effects: EffectEvent[];
+}) {    const [ms, setMs] = useState<number>(() => Math.max(0, new Date(dueAt).getTime() - Date.now()));
     const totalMs = Math.max(1, new Date(dueAt).getTime() - new Date(startedAt).getTime());
     useEffect(() => {
         const id = setInterval(() => setMs(Math.max(0, new Date(dueAt).getTime() - Date.now())), 100);
@@ -293,8 +335,17 @@ function TurnTimer({ startedAt, dueAt }: { startedAt: string; dueAt: string }) {
     const progress = Math.min(100, Math.max(0, ((totalMs - ms) / totalMs) * 100));
     const danger = ms < 4000;
     return (
-        <div className={`alert ${danger ? "alert-warning" : "alert-secondary"} mb-0`} aria-live="polite" role="status">
-            <div className="d-flex align-items-center gap-3">
+        <div
+            className={`alert ${danger ? "alert-warning" : "alert-secondary"} mb-0 position-relative`}
+            aria-live="polite"
+            role="status"
+            style={{ overflow: "visible" }}
+        >
+            <div className="timer-effect-stack" aria-hidden={effects.length === 0}>
+                {effects.map((effect) => (
+                    <EffectChip key={effect.id} effect={effect} floating />
+                ))}
+            </div>            <div className="d-flex align-items-center gap-3">
                 <div className="flex-1">
                     Time left: <strong>{s}s</strong>
                     <div className="progress mt-2" style={{ height: 10 }} aria-label="Turn timer">
