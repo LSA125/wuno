@@ -202,23 +202,25 @@ namespace Wuno.Application.Games.Implementation
 
             if (game is null || game.CurrentTurn is null || game.CurrentRound is null || game.CurrentTurn.Id != turnId || game.CurrentRound.Id != roundId)
             {
-                return new(false, "Not found", null);
+                return new(false, "Not found", null, null);
             }
 
             Turn currentTurn = game.CurrentTurn;
             if (currentTurn.EndedAt != null)
             {
-                return new(false, "Turn already processed", null);
+                return new(false, "Turn already processed", null, null);
             }
 
             Player? player = game.Players.SingleOrDefault(p => p.Id == playerId);
             if (player is null || player.Seat != seat || currentTurn.Seat != seat)
             {
-                return new(false, "Not your turn", null);
+                return new(false, "Not your turn", null, null);
             }
 
             int personalIndex = player.TurnsPlayedThisRound;
             bool timedOut = now > currentTurn.DueAt;
+            List<EffectState> appliedEffects = [];
+            TurnHistoryState? completedTurn = null;
 
             if (timedOut)
             {
@@ -230,17 +232,25 @@ namespace Wuno.Application.Games.Implementation
             else
             {
                 var w = word;
-                if (!_wl.IsWord(w)) return new(false, "Not a valid word", null);
-                if (w.Length < currentTurn.MinLen) return new(false, $"Word too short (min {currentTurn.MinLen})", null);
+                if (!_wl.IsWord(w)) return new(false, "Not a valid word", null, null);
+                if (w.Length < currentTurn.MinLen) return new(false, $"Word too short (min {currentTurn.MinLen})", null, null);
                 if (!currentTurn.FreeStart
                     && !game.LastWord.IsNullOrEmpty()
                     && w.First() == game.LastWord!.Last())
                 {
-                    return new(false, $"Word must start with '{game.LastWord!.Last()}'", null);
+                    return new(false, $"Word must start with '{game.LastWord!.Last()}'", null, null);
                 }
-
                 bool playedThisRound = await _db.Turns.AnyAsync(t => t.GameId == gameId && t.RoundId == roundId && t.Word == w, ct);
-                if (playedThisRound) return new(false, "Word already played this round", null);
+                if (playedThisRound) return new(false, "Word already played this round", null, null);
+
+                appliedEffects = await _db.Effects
+                    .AsNoTracking()
+                    .Where(e => e.GameId == gameId
+                        && e.RoundId == roundId
+                        && e.TargetSeat == seat
+                        && e.AppliesOnTurn == personalIndex)
+                    .Select(e => new EffectState(e.Type, e.Value))
+                    .ToListAsync(ct);
 
                 currentTurn.Word = w;
                 currentTurn.EndedAt = now;
@@ -248,6 +258,7 @@ namespace Wuno.Application.Games.Implementation
                 player.LastWord = w;
                 player.TurnsPlayedThisRound += 1;
                 game.LastWord = w;
+                completedTurn = new TurnHistoryState(currentTurn.Id, currentTurn.Index, seat, w, currentTurn.MinLen, currentTurn.FreeStart, appliedEffects);
             }
 
             bool roundEnded = game.Players.Count(p => p.IsTaken && p.IsActive) <= 1;
@@ -313,7 +324,7 @@ namespace Wuno.Application.Games.Implementation
             RoundState roundState = State.RoundToState(game.CurrentRound!);
             GameState state = State.GameToState(game, players, roundState, currentTurnState);
 
-            return new(true, null, state);
+            return new(true, null, state, completedTurn);
         }
         public async Task<List<PlayerState>> GetPlayersAsync(Guid gameId, CancellationToken ct)
         {
@@ -390,6 +401,49 @@ namespace Wuno.Application.Games.Implementation
               .FirstOrDefaultAsync(ct);
             if (seat == 0) throw new Exception("No active turn found");
             return seat;
+        }
+
+        public async Task<List<TurnHistoryState>> GetRecentWordHistoryAsync(Guid gameId, CancellationToken ct)
+        {
+            var game = await _db.Games
+                .AsNoTracking()
+                .Include(g => g.CurrentRound)
+                .FirstOrDefaultAsync(g => g.Id == gameId, ct);
+
+            if (game?.CurrentRound is null)
+            {
+                return [];
+            }
+
+            Guid roundId = game.CurrentRound.Id;
+
+            var turns = await _db.Turns
+                .AsNoTracking()
+                .Where(t => t.GameId == gameId && t.RoundId == roundId && t.Word != null)
+                .OrderBy(t => t.Index)
+                .ToListAsync(ct);
+
+            var roundEffects = await _db.Effects
+                .AsNoTracking()
+                .Where(e => e.GameId == gameId && e.RoundId == roundId)
+                .ToListAsync(ct);
+
+            Dictionary<int, int> personalIndex = new();
+            List<TurnHistoryState> history = [];
+
+            foreach (var turn in turns)
+            {
+                personalIndex.TryGetValue(turn.Seat, out var idx);
+                var effects = roundEffects
+                    .Where(e => e.TargetSeat == turn.Seat && e.AppliesOnTurn == idx)
+                    .Select(e => new EffectState(e.Type, e.Value))
+                    .ToList();
+
+                history.Add(new TurnHistoryState(turn.Id, turn.Index, turn.Seat, turn.Word!, turn.MinLen, turn.FreeStart, effects));
+                personalIndex[turn.Seat] = idx + 1;
+            }
+
+            return history;
         }
         private Player? FindNextValidPlayer(IReadOnlyList<Player> players, int curSeat)
         {

@@ -13,6 +13,7 @@ namespace Wuno.Application.Games.Inheritance
         Task<List<PlayerState>> GetPlayersAsync(Guid gameId, CancellationToken ct);
         Task<GameState> GetGameStateAsync(Guid gameId, CancellationToken ct); // compact state for UI
         Task<int> GetCurrentSeatAsync(Guid gameId, CancellationToken ct);
+        Task<List<TurnHistoryState>> GetRecentWordHistoryAsync(Guid gameId, CancellationToken ct);
         Task<GameCodeResponse> GetUserActiveGameCodeAsync(Guid userId, CancellationToken ct);
         Task<JoinGameResponse> JoinGameAsync(Guid gameId, Guid userId, CancellationToken ct);
         Task<ProcessTurnOutcome> ProcessTurnAsync(Guid gameId, Guid roundId, Guid turnId, Guid playerId, int seat, string word, CancellationToken ct);

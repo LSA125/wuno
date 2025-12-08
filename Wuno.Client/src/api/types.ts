@@ -28,7 +28,15 @@ export type TurnState = {
     freeStart: boolean;
     effects: EffectState[];
 };
-
+export type TurnHistoryState = {
+    turnId: string;
+    index: number;
+    seat: number;
+    word: string;
+    minLen: number;
+    freeStart: boolean;
+    effects: EffectState[];
+};
 export type RoundState = {
     roundId: string;
     index: number;

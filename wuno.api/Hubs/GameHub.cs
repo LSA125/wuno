@@ -46,6 +46,8 @@ namespace Wuno.Api.Hubs
                 await Groups.AddToGroupAsync(Context.ConnectionId, $"game:{gameId}", ct);
 
                 await Clients.Caller.SendAsync("ConnectedToGame", res, ct);
+                var history = await _svc.GetRecentWordHistoryAsync(gameId, ct);
+                await Clients.Caller.SendAsync("RecentWordHistory", history, ct);
                 await Clients.Group($"game:{gameId}").SendAsync("PlayersUpdated", res.State.Players, ct);
             }
             catch (Exception ex)
@@ -119,7 +121,19 @@ namespace Wuno.Api.Hubs
             }
             _turnTimer.Cancel(turnId);
             _turnTimer.Schedule(gameId, outcome.State!.CurrentTurn.TurnId, outcome.State.CurrentTurn.DueAt, BroadcastAfterTimeout);
+            if (outcome.CompletedTurn is not null)
+            {
+                await _hub.Clients.Group($"game:{gameId}").SendAsync("WordHistoryAppended", outcome.CompletedTurn, ct);
+            }
             await _hub.Clients.Group($"game:{gameId}").SendAsync("GameUpdated", outcome.State, ct);
+        }
+        public async Task RequestRecentWordHistory(Guid gameId)
+        {
+            var ct = Context.ConnectionAborted;
+            var ps = RequireSession();
+            if (ps.GameId != gameId) throw new HubException("Wrong game context.");
+            var history = await _svc.GetRecentWordHistoryAsync(gameId, ct);
+            await Clients.Caller.SendAsync("RecentWordHistory", history, ct);
         }
         public async Task WordChanged(string word)
         {

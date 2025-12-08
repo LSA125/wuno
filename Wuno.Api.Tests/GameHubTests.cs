@@ -23,8 +23,7 @@ namespace Wuno.Api.Tests
             var service = FakeGameService.ForTurn(new ProcessTurnOutcome(true, null, new GameState(Guid.NewGuid(), wuno.domain.GameStatus.ACTIVE, 0, 1, 2, null,
                 [new PlayerState(Guid.NewGuid(), 0, true, true, "p1", null, 0, null)],
                 new RoundState(Guid.NewGuid(), 0, null, DateTime.UtcNow, null),
-                new TurnState(nextTurn, 1, 0, DateTime.UtcNow, DateTime.UtcNow.AddSeconds(5), 1, false, []))));
-
+                new TurnState(nextTurn, 1, 0, DateTime.UtcNow, DateTime.UtcNow.AddSeconds(5), 1, false, [])), null));
             var hub = CreateHub(service, tracker, turnTimer, hubContext, clients, userId: Guid.NewGuid());
             tracker.Add(hub.Context.ConnectionId, new PlayerSession(service.LastGameId, Guid.NewGuid(), 0, service.TestUser));
             turnTimer.Schedule(service.LastGameId, initialTurn, DateTime.UtcNow.AddSeconds(1), _ => Task.CompletedTask);
@@ -42,8 +41,7 @@ namespace Wuno.Api.Tests
             var turnTimer = new Testing.Fixtures.FakeTurnTimer();
             var clients = new TestHubCallerClients();
             var hubContext = new TestHubContext(clients);
-            var service = FakeGameService.ForTurn(new ProcessTurnOutcome(false, "bad", null));
-
+            var service = FakeGameService.ForTurn(new ProcessTurnOutcome(false, "bad", null, null));
             var hub = CreateHub(service, tracker, turnTimer, hubContext, clients, userId: Guid.NewGuid());
             tracker.Add(hub.Context.ConnectionId, new PlayerSession(service.LastGameId, Guid.NewGuid(), 0, service.TestUser));
 
@@ -104,7 +102,7 @@ namespace Wuno.Api.Tests
 
             public static FakeGameService ForJoin(JoinGameResponse join)
             {
-                return new FakeGameService(join, new ProcessTurnOutcome(false, "unused", null));
+                return new FakeGameService(join, new ProcessTurnOutcome(false, "unused", null, null));
             }
 
             public static FakeGameService ForTurn(ProcessTurnOutcome outcome)
@@ -134,6 +132,10 @@ namespace Wuno.Api.Tests
             public Task<ProcessTurnOutcome> ProcessTurnAsync(Guid gameId, Guid roundId, Guid turnId, Guid playerId, int seat, string word, CancellationToken ct)
             {
                 return Task.FromResult(_turnOutcome!);
+            }
+            public Task<List<TurnHistoryState>> GetRecentWordHistoryAsync(Guid gameId, CancellationToken ct)
+            {
+                return Task.FromResult(new List<TurnHistoryState>());
             }
 
             public Task<GameState> GetGameStateAsync(Guid gameId, CancellationToken ct)

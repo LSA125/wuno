@@ -72,7 +72,9 @@ public sealed class GamesControllerTests
         public Task<TurnState> StartMatchAsync(Guid gameId, CancellationToken ct)
             => Task.FromResult(new TurnState(Guid.NewGuid(), 0, 0, DateTime.UtcNow, DateTime.UtcNow, 1, false, new List<EffectState>()));
         public Task<ProcessTurnOutcome> ProcessTurnAsync(Guid gameId, Guid roundId, Guid turnId, Guid playerId, int seat, string word, CancellationToken ct)
-            => Task.FromResult(new ProcessTurnOutcome(false, "bad", null));
+            => Task.FromResult(new ProcessTurnOutcome(false, "bad", null, null));
+        public Task<List<TurnHistoryState>> GetRecentWordHistoryAsync(Guid gameId, CancellationToken ct)
+            => Task.FromResult(new List<TurnHistoryState>());
         public Task ReadyAsync(Guid gameId, int seat, bool isReady, CancellationToken ct) => Task.CompletedTask;
         public Task LeaveGameAsync(Guid userId, CancellationToken ct) => Task.CompletedTask;
     }

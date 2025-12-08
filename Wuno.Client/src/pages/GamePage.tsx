@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
-import type { GameState, JoinGameResponse, PlayerState } from "@/api/types";
+import type { GameState, JoinGameResponse, PlayerState, TurnHistoryState } from "@/api/types";
 import { getCookie } from "@/auth/cookies";
 import WaitingRoom from "@/components/game/WaitingRoom";
 import RoundStart from "@/components/game/RoundStart";
@@ -24,9 +24,12 @@ export default function GamePage() {
     const [phase, setPhase] = useState<Phase>("waiting");
     const [roundCountdownMs, setRoundCountdownMs] = useState<number | null>(null);
     const [typedBySeat, setTypedBySeat] = useState<Record<number, string>>({});
+    const [wordHistory, setWordHistory] = useState<TurnHistoryState[]>([]);
     const { push } = useToast();
 
     const lastRoundRef = useRef<string | null>(null);
+    const gameIdRef = useRef<string | null>(null);
+    const roundIdRef = useRef<string | null>(null);
 
     const myUserId = useMemo(() => {
         return (user?.userId as string | undefined) || getCookie() || "";
@@ -60,6 +63,17 @@ export default function GamePage() {
             push("Couldn't copy the link. Try manually copying the address bar.");
         }
     };
+    const requestRecentHistory = useCallback(async () => {
+        const hub = hubRef.current;
+        const gameId = gameIdRef.current;
+        if (!hub || !gameId) return;
+        try {
+            const history = await hub.invoke<TurnHistoryState[]>("RequestRecentWordHistory", gameId);
+            setWordHistory(history);
+        } catch (err) {
+            console.error("Recent history request failed", err);
+        }
+    }, []);
     useEffect(() => {
         const beforeUnload = () => {
             // best-effort: no await (unload), but hub stop is fine
@@ -93,7 +107,10 @@ export default function GamePage() {
             setState(res.state);
             const seat = res.state.players.find(p => p.playerId === res.playerId)?.seat ?? null;
             setMeSeat(seat);
+            gameIdRef.current = res.state.gameId;
             lastRoundRef.current = res.state.currentRound?.roundId ?? null;
+            roundIdRef.current = res.state.currentRound?.roundId ?? null;
+            setWordHistory([]);
             setPhase(derivePhaseFromGame(res.state));
         });
 
@@ -124,6 +141,13 @@ export default function GamePage() {
             setState(g);
             setPhase(derivePhaseFromGame(g));
             if (g.status !== 0) setRoundCountdownMs(null);
+            gameIdRef.current = g.gameId;
+            const nextRoundId = g.currentRound?.roundId ?? null;
+            if (roundIdRef.current !== nextRoundId) {
+                roundIdRef.current = nextRoundId;
+                setWordHistory([]);
+                requestRecentHistory();
+            }
         });
 
         hub.on("NewRoundStarted", () => { });
@@ -141,18 +165,36 @@ export default function GamePage() {
             setPhase("ended");
         });
 
-            hub.on("WordChanged", (word: string) => {
-                setState(s => {
-                    if (!s) return s;
-                    const seat = s.currentTurn?.seat;
-                    if (seat == null) return s;
-                    setTypedBySeat(prev => ({ ...prev, [seat]: word }));
-                    return s;
-                });
+        hub.on("WordChanged", (word: string) => {
+            setState(s => {
+                if (!s) return s;
+                const seat = s.currentTurn?.seat;
+                if (seat == null) return s;
+                setTypedBySeat(prev => ({ ...prev, [seat]: word }));
+                return s;
             });
+        });
+
+        hub.on("RecentWordHistory", (history: TurnHistoryState[]) => {
+            if (cancelled) return;
+            setWordHistory(history);
+        });
+
+        hub.on("WordHistoryAppended", (entry: TurnHistoryState) => {
+            if (cancelled) return;
+            setWordHistory(prev => {
+                if (prev.some(h => h.turnId === entry.turnId)) return prev;
+                if (roundIdRef.current == null) return [...prev, entry];
+                return [...prev, entry];
+            });
+        });
 
         hub.on("error", (err: string) => {
             console.error("Hub error:", err);
+        });
+
+        hub.onreconnected(() => {
+            requestRecentHistory();
         });
 
         await hub.start();
@@ -169,7 +211,7 @@ export default function GamePage() {
         cancelled = true;
         if (hubRef.current?.state === "Connected") hubRef.current.stop();
     };
-    }, [code, myUserId, nav, push]);
+    }, [code, myUserId, nav, push, requestRecentHistory]);
 
 
     // Ready toggle
@@ -285,6 +327,7 @@ export default function GamePage() {
                     canLeave={!!hubRef.current && hubRef.current.state === "Connected"}
                     ended={phase === "ended"}
                     currentTurn={state.currentTurn ?? null}
+                    wordHistory={wordHistory}
                 />
             )}
         </div>

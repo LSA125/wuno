@@ -1,24 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import type { EffectState, GameState, TurnState } from "@/api/types";
+import type { EffectState, GameState, TurnHistoryState, TurnState } from "@/api/types";
 import EffectChip from "./pieces/EffectChip";
 import RequiredLengthGauge from "./pieces/RequiredLengthGauge";
 import PlayerSidebar from "./PlayerSidebar";
 import RestrictionTrack from "./pieces/RestrictionTrack";
 import { EffectType } from "./pieces/effectTypes";
-const normalizeWord = (word: string) =>
-    word
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase()
-        .replace(/[^a-z]/g, "");
+import WordPreview from "./pieces/WordPreview";
+import RecentWordHistory from "./pieces/RecentWordHistory";
+import { computeReverseMatchLength, normalizeWord, reverseString } from "@/utils/wordMatching";
 
-const reverseString = (str: string) => str.split("").reverse().join("");
-
-const computeReverseMatchLength = (typed: string, reversed: string) => {
-    let len = 0;
-    while (len < typed.length && len < reversed.length && typed[len] === reversed[len]) len++;
-    return len;
-};
 type LiveGameProps = {
     state: GameState;
     meSeat: number;
@@ -29,6 +19,7 @@ type LiveGameProps = {
     canLeave?: boolean;
     ended: boolean;
     currentTurn: TurnState | null;
+    wordHistory: TurnHistoryState[];
 };
 type EffectEvent = EffectState & { id: number };
 export default function LiveGame({
@@ -41,6 +32,7 @@ export default function LiveGame({
     canLeave = true,
     ended,
     currentTurn,
+    wordHistory,
 }: LiveGameProps) {
 
     const turn: TurnState | null = currentTurn;
@@ -48,7 +40,7 @@ export default function LiveGame({
     const [input, setInput] = useState("");
     const [invalidReason, setInvalidReason] = useState<string | null>(null);
     const [shake, setShake] = useState(false);
-    const [wordHistory, setWordHistory] = useState<Set<string>>(new Set());
+    const [seenWords, setSeenWords] = useState<Set<string>>(new Set());
     const [effectEvents, setEffectEvents] = useState<EffectEvent[]>([]);
     const lastMatchRef = useRef(0);
     const lastTurnIdRef = useRef<string | null>(null);
@@ -60,7 +52,7 @@ export default function LiveGame({
         players.forEach((p) => {
             if (p.lastWord) nextHistory.add(normalizeWord(p.lastWord));
         });
-        setWordHistory(nextHistory);
+        setSeenWords(nextHistory);
         setInput("");
         setInvalidReason(null);
         setShake(false);
@@ -153,7 +145,7 @@ export default function LiveGame({
         if (reversedPrevious && reverseMatchLength < Math.min(reversedPrevious.length, normalized.length)) {
             return "Follow the reverse chain to keep the streak alive.";
         }
-        if (wordHistory.has(normalized)) return "That word already appeared this match.";
+        if (seenWords.has(normalized)) return "That word already appeared this match.";
         return null;
     };
 
@@ -170,7 +162,7 @@ export default function LiveGame({
         const trimmed = input.trim();
         if (!trimmed) return;
         onSubmit(trimmed);
-        setWordHistory((prev) => new Set(prev).add(normalizeWord(trimmed)));
+        setSeenWords((prev) => new Set(prev).add(normalizeWord(trimmed)));
         setInput("");
         setInvalidReason(null);
         setShake(false);
@@ -244,12 +236,14 @@ export default function LiveGame({
                                     )}
                                 </div>
                                 <div className="text-xs text-muted">Seat {turn.seat} · Wins: {currentPlayer?.roundWins ?? 0}</div>
-                                <div className="mt-2 font-mono text-lg tracking-wide text-primary">
-                                    {activeTyped ? (
-                                        <span className="uppercase">{activeTyped}</span>
-                                    ) : (
-                                        <span className="text-muted">Waiting for their word…</span>
-                                    )}
+                                <div className="mt-2">
+                                    <WordPreview
+                                        word={activeTyped || ""}
+                                        previousWord={previousWord || ""}
+                                        minLen={minLen}
+                                        reverseMatchLength={reverseMatchLength}
+                                        label="Current typing preview"
+                                    />
                                 </div>
                             </div>
                             <span className="badge text-bg-primary">Current turn</span>
@@ -266,7 +260,7 @@ export default function LiveGame({
                         invalid={shake}
                         requiredWords={totalLettersNeeded}
                     />
-
+                    <RecentWordHistory history={wordHistory} fallbackPrevious={previousWord || ""} />
                     <div className="flex flex-wrap gap-4 align-items-center">
                         <RequiredLengthGauge value={(activeTyped || "").length} min={minLen} />
                         <div className="flex-1 min-w-[260px]">
