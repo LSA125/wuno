@@ -2,14 +2,15 @@ import type { TurnHistoryState } from "@/api/types";
 import WordPreview from "./WordPreview";
 
 export type RecentWordHistoryProps = {
-    history: TurnHistoryState[];
+    history: TurnHistoryState[] | null | undefined;
     fallbackPrevious?: string | null;
 };
 
 export default function RecentWordHistory({ history, fallbackPrevious }: RecentWordHistoryProps) {
-    const listCount = Math.min(5, Math.max(3, history.length || 0));
-    const recent = history.slice(-listCount);
-    const offset = history.length - recent.length;
+    const entries = history ?? [];
+    const listCount = Math.min(entries.length, 4);
+    const recent = entries.slice(-listCount);
+    const offset = entries.length - recent.length;
 
     return (
         <div className="recent-words card border-0 shadow-sm">
@@ -19,13 +20,13 @@ export default function RecentWordHistory({ history, fallbackPrevious }: RecentW
                         <p className="text-uppercase text-muted small mb-1">Recent words</p>
                         <h6 className="mb-0">Words this round</h6>
                     </div>
-                    <span className="badge text-bg-light">{history.length}</span>
+                    <span className="badge text-bg-light">{entries.length}</span>
                 </div>
                 <ol className="recent-word-list list-unstyled m-0 d-flex flex-column gap-2">
                     {recent.map((entry, idx) => {
                         const globalIdx = offset + idx;
                         const prevWord =
-                            globalIdx > 0 ? history[globalIdx - 1]?.word : fallbackPrevious || "";
+                            globalIdx > 0 ? entries[globalIdx - 1]?.word : fallbackPrevious || "";
                         return (
                             <li key={entry.turnId} className="recent-word-row">
                                 <div className="d-flex justify-content-between align-items-center gap-3">
@@ -47,7 +48,7 @@ export default function RecentWordHistory({ history, fallbackPrevious }: RecentW
                             </li>
                         );
                     })}
-                    {history.length === 0 && <li className="text-muted small">No words yet this round.</li>}
+                    {entries.length === 0 && <li className="text-muted small">No words yet this round.</li>}
                 </ol>
             </div>
         </div>
