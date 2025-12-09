@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { EffectState, GameState, TurnHistoryState, TurnState } from "@/api/types";
-import EffectChip from "./pieces/EffectChip";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { GameState, TurnHistoryState, TurnState } from "@/api/types";
 import RequiredLengthGauge from "./pieces/RequiredLengthGauge";
 import PlayerSidebar from "./PlayerSidebar";
 import RestrictionTrack from "./pieces/RestrictionTrack";
-import { EffectType } from "./pieces/effectTypes";
+import { EffectType, EffectEvent } from "./pieces/effectTypes";
 import RecentWordHistory from "./pieces/RecentWordHistory";
 import { computeReverseMatchLength, normalizeWord, reverseString } from "@/utils/wordMatching";
+import TurnTimer from "./pieces/TurnTimer";
 
 type LiveGameProps = {
     state: GameState;
@@ -21,7 +21,6 @@ type LiveGameProps = {
     currentTurn: TurnState | null;
     wordHistory: TurnHistoryState[];
 };
-type EffectEvent = EffectState & { id: number };
 export default function LiveGame({
     state,
     meSeat,
@@ -307,51 +306,5 @@ export default function LiveGame({
             </div>
             <PlayerSidebar players={players} currentSeat={turn.seat} meSeat={meSeat} turnContext={turnContext ?? undefined} />
         </section>
-    );
-}
-
-function TurnTimer({
-    startedAt,
-    dueAt,
-    effects,
-}: {
-    startedAt: string;
-    dueAt: string;
-    effects: EffectEvent[];
-}) {    const [ms, setMs] = useState<number>(() => Math.max(0, new Date(dueAt).getTime() - Date.now()));
-    const totalMs = Math.max(1, new Date(dueAt).getTime() - new Date(startedAt).getTime());
-    useEffect(() => {
-        const id = setInterval(() => setMs(Math.max(0, new Date(dueAt).getTime() - Date.now())), 100);
-        return () => clearInterval(id);
-    }, [dueAt]);
-    const s = (ms / 1000).toFixed(1);
-    const progress = Math.min(100, Math.max(0, ((totalMs - ms) / totalMs) * 100));
-    const danger = ms < 4000;
-    return (
-        <div
-            className={`alert ${danger ? "alert-warning" : "alert-secondary"} mb-0 position-relative w-100`}
-            aria-live="polite"
-            role="status"
-            style={{ overflow: "visible" }}
-        >
-            <div className="timer-effect-stack" aria-hidden={effects.length === 0}>
-                {effects.map((effect) => (
-                    <EffectChip key={effect.id} effect={effect} floating />
-                ))}
-            </div>            <div className="d-flex align-items-center gap-3">
-                <div className="flex-1">
-                    Time left: <strong>{s}s</strong>
-                    <div className="progress mt-2" style={{ height: 10 }} aria-label="Turn timer">
-                        <div
-                            className={`progress-bar ${danger ? "bg-danger" : "bg-primary"}`}
-                            style={{ width: `${progress}%`, transition: "width 120ms linear" }}
-                            aria-valuenow={progress}
-                            aria-valuemin={0}
-                            aria-valuemax={100}
-                        />
-                    </div>
-                </div>
-            </div>
-        </div>
     );
 }
