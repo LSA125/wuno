@@ -5,7 +5,6 @@ import RequiredLengthGauge from "./pieces/RequiredLengthGauge";
 import PlayerSidebar from "./PlayerSidebar";
 import RestrictionTrack from "./pieces/RestrictionTrack";
 import { EffectType } from "./pieces/effectTypes";
-import WordPreview from "./pieces/WordPreview";
 import RecentWordHistory from "./pieces/RecentWordHistory";
 import { computeReverseMatchLength, normalizeWord, reverseString } from "@/utils/wordMatching";
 
@@ -259,9 +258,17 @@ export default function LiveGame({
             <div className="game-panel" data-sound-turn={myTurn ? "active" : undefined}>
 
                 <div className="d-flex flex-wrap justify-content-between align-items-start gap-3">
-                    <div>
-                        <p className="text-uppercase text-muted small mb-1">Round {roundIndex}</p>
-                        <h4 className="mb-0">Turn #{turn.index + 1} · Seat {turn.seat}</h4>
+                    <div className="d-flex flex-column gap-1">
+                        <p className="text-uppercase text-muted small mb-0">Round {roundIndex}</p>
+                        <div className="d-flex flex-wrap align-items-center gap-2">
+                            <h4 className="mb-0">Turn #{turn.index + 1}</h4>
+                            <span className="badge text-bg-light">Seat {turn.seat}</span>
+                            {currentPlayer?.name && <span className="text-muted small">{currentPlayer.name}</span>}
+                            {myTurn && <span className="badge text-bg-info text-uppercase">You</span>}
+                            {!currentPlayer?.isConnected && (
+                                <span className="badge text-bg-danger d-inline-flex align-items-center gap-1">Offline</span>
+                            )}
+                        </div>
                     </div>
                     <div className="d-flex gap-2 align-items-center position-relative">
                         <span className={`badge text-bg-primary ${lengthEffects.length ? "length-pulse" : ""}`}>
@@ -279,40 +286,7 @@ export default function LiveGame({
                 </div>
 
                 <div className="d-flex flex-column gap-4 mt-4">
-                    <div className="typing-banner" aria-live="polite">
-                        <div className="d-flex gap-3 align-items-center">
-                            <img
-                                src={currentPlayer?.iconUrl || "/avatar.svg"}
-                                className="rounded-circle border flex-shrink-0"
-                                width={56}
-                                height={56}
-                                alt={currentPlayer?.name || "Player avatar"}
-                            />
-                            <div className="flex-1">
-                                <div className="d-flex flex-wrap align-items-center gap-2">
-                                    <div className="fw-semibold leading-tight">{currentPlayer?.name || `Seat ${turn.seat}`}</div>
-                                    {myTurn && <span className="badge text-bg-info text-uppercase">You</span>}
-                                    {!currentPlayer?.isConnected && (
-                                        <span className="badge text-bg-danger d-inline-flex align-items-center gap-1">
-                                            Offline
-                                        </span>
-                                    )}
-                                </div>
-                                <div className="text-xs text-muted">Seat {turn.seat} · Wins: {currentPlayer?.roundWins ?? 0}</div>
-                                <div className="mt-2">
-                                    <WordPreview
-                                        word={activeTyped || ""}
-                                        previousWord={previousWord || ""}
-                                        minLen={minLen}
-                                        reverseMatchLength={reverseMatchLength}
-                                        label="Current typing preview"
-                                    />
-                                </div>
-                            </div>
-                            <span className="badge text-bg-primary">Current turn</span>
-                        </div>
-                    </div>
-                    <TurnTimer startedAt={turn.startedAt} dueAt={turn.dueAt} effects={timerEffects} />
+
                     <RestrictionTrack
                         minLen={minLen}
                         typedWord={activeTyped || ""}
@@ -323,8 +297,13 @@ export default function LiveGame({
                         invalid={shake}
                         requiredWords={totalLettersNeeded}
                     >
+                        <div className="d-flex justify-content-between align-items-center text-muted small mb-2">
+                            <span>{myTurn ? "You are up now" : `${currentPlayer?.name || `Seat ${turn.seat}`} is playing`}</span>
+                            <span>Turn {turn.index + 1} · Wins {currentPlayer?.roundWins ?? 0}</span>
+                        </div>
                         <RecentWordHistory history={wordHistory} fallbackPrevious={previousWord || ""} />
                     </RestrictionTrack>
+                    <TurnTimer startedAt={turn.startedAt} dueAt={turn.dueAt} effects={timerEffects} />
                     <div className="flex flex-wrap gap-4 align-items-center">
                         <RequiredLengthGauge value={(activeTyped || "").length} min={minLen} />
                         <div className="flex-1 min-w-[260px]">
