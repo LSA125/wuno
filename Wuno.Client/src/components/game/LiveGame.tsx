@@ -7,6 +7,7 @@ import { EffectType, EffectEvent } from "./pieces/effectTypes";
 import RecentWordHistory from "./pieces/RecentWordHistory";
 import { computeReverseMatchLength, normalizeWord, reverseString } from "@/utils/wordMatching";
 import TurnTimer from "./pieces/TurnTimer";
+import wordListText from "@/assets/words.txt?raw";
 
 type LiveGameProps = {
     state: GameState;
@@ -46,6 +47,11 @@ export default function LiveGame({
     const lastTurnIdRef = useRef<string | null>(null);
     const lastEffectCountRef = useRef(0);
     const audioRef = useRef<AudioContext | null>(null);
+
+    const dictionary = useMemo(
+        () => new Set(wordListText.split(/\r?\n/).map(normalizeWord).filter(Boolean)),
+        []
+    );
 
     useEffect(() => {
         const nextHistory = new Set<string>();
@@ -130,10 +136,11 @@ export default function LiveGame({
             if (reversedPrevious && reverseMatchLength < Math.min(reversedPrevious.length, normalized.length)) {
                 return "Follow the reverse chain to keep the streak alive.";
             }
+            if (!dictionary.has(normalized)) return "Not in the allowed word list.";
             if (seenWords.has(normalized)) return "That word already appeared this match.";
             return null;
         },
-        [myTurn, minLen, requiredStart, reversedPrevious, reverseMatchLength, seenWords, turn?.freeStart]
+        [dictionary, myTurn, minLen, requiredStart, reversedPrevious, reverseMatchLength, seenWords, turn?.freeStart]
     );
 
     const canSubmit = !ended && validateWord(input) === null;
