@@ -298,8 +298,7 @@ export default function LiveGame({
                         requiredWords={totalLettersNeeded}
                     >
                         <RecentWordHistory history={wordHistory} fallbackPrevious={previousWord || ""} />
-                        <div className="d-flex justify-content-between align-items-center text-muted small mt-2">
-                            <span>{myTurn ? "You are up now" : `${currentPlayer?.name || `Seat ${turn.seat}`} is playing`}</span>
+                        <div className="d-flex justify-content-end align-items-center text-muted small mt-2">
                             <span>Turn {turn.index + 1} · Wins {currentPlayer?.roundWins ?? 0}</span>
                         </div>
                     </RestrictionTrack>
@@ -342,6 +341,7 @@ export default function LiveGame({
                     </div>
                 </div>
             </div>
+            <PlayerSidebar players={players} currentSeat={turn.seat} meSeat={meSeat} />
         </section>
     );
 }
