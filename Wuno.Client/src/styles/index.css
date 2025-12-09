@@ -130,6 +130,34 @@ body {
     opacity: 0.85;
 }
 
+.effect-chip-compact {
+    box-shadow: none;
+    border: 1px dashed rgba(0, 0, 0, 0.12);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.9);
+    color: inherit;
+    letter-spacing: 0.02em;
+    padding: 4px 8px;
+}
+
+    .effect-chip-compact.text-bg-success {
+        color: #198754;
+        background: rgba(25, 135, 84, 0.14);
+        border-color: rgba(25, 135, 84, 0.28);
+    }
+
+    .effect-chip-compact.text-bg-danger {
+        color: #c22b2b;
+        background: rgba(220, 53, 69, 0.12);
+        border-color: rgba(220, 53, 69, 0.32);
+    }
+
+    .effect-chip-compact.text-bg-info {
+        color: #0d6efd;
+        background: rgba(13, 110, 253, 0.12);
+        border-color: rgba(13, 110, 253, 0.28);
+    }
+
 .effect-float {
     animation: effectFloat 1.4s ease-out forwards;
     transform-origin: 50% 50%;
@@ -382,14 +410,11 @@ body {
     background: rgba(255, 255, 255, 0.82);
 }
 .recent-word-inline {
-    background: linear-gradient(180deg, rgba(13, 110, 253, 0.06), transparent);
-    border-radius: 12px;
-    padding: 10px 12px;
-    border: 1px dashed rgba(13, 110, 253, 0.12);
+    padding-top: 4px;
 }
 
 .recent-word-track {
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
 .history-box {
@@ -397,16 +422,28 @@ body {
     justify-content: flex-start;
     gap: 6px;
     text-align: left;
-    background: rgba(13, 110, 253, 0.06);
-    border-color: rgba(13, 110, 253, 0.2);
+    background: rgba(255, 255, 255, 0.82);
+    border-color: rgba(0, 0, 0, 0.08);
 }
     .history-box .word-preview {
         gap: 4px;
+        width: 100%;
     }
 
-    .history-box .word-letter {
-        background: rgba(13, 110, 253, 0.08);
-        border-color: rgba(13, 110, 253, 0.16);
+        .history-box .word-preview .word-letter {
+            background: rgba(13, 110, 253, 0.06);
+            border-color: rgba(13, 110, 253, 0.14);
+        }
+
+    .history-box .word-preview-compact .word-letter {
+        min-width: 28px;
+    }
+
+    .history-box .recent-effect-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        width: 100%;
     }
 
     .history-box.muted {

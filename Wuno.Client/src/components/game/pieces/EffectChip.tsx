@@ -5,6 +5,7 @@ type EffectChipProps = {
     effect: EffectState;
     floating?: boolean;
     subtle?: boolean;
+    compact?: boolean;
 };
 
 function describeEffect(effect: EffectState) {
@@ -24,14 +25,15 @@ function describeEffect(effect: EffectState) {
     }
 }
 
-export default function EffectChip({ effect, floating = false, subtle = false }: EffectChipProps) {
+export default function EffectChip({ effect, floating = false, subtle = false, compact = false }: EffectChipProps) {
     const { label, tone } = describeEffect(effect);
     const toneClass =
         tone === "good" ? "text-bg-success" : tone === "bad" ? "text-bg-danger" : "text-bg-info";
     const motionClass = floating ? "effect-float" : "effect-pulse";
     const subtleClass = subtle ? "effect-chip-subtle" : "";
+    const compactClass = compact ? "effect-chip-compact" : "";
     return (
-        <span className={`badge effect-chip ${toneClass} ${motionClass} ${subtleClass}`} aria-label={label}>
+        <span className={`badge effect-chip ${toneClass} ${motionClass} ${subtleClass} ${compactClass}`} aria-label={label}>
             {label}
         </span>
     );

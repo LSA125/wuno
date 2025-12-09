@@ -73,6 +73,7 @@ export default function RestrictionTrack({
                     })}
                 </div>
 
+                {children && <div className="mt-3">{children}</div>}
                 <div className="d-flex flex-wrap gap-3 mt-3 text-muted small">
                     <span>{freeStart ? "Free start — ignore the first letter" : `Must start with ${startLetter?.toUpperCase() || "?"}`}</span>
                     <span className="dot" aria-hidden="true" />
@@ -80,7 +81,6 @@ export default function RestrictionTrack({
                     <span className="dot" aria-hidden="true" />
                     <span>Need at least {requiredWords} letters before submitting.</span>
                 </div>
-                {children && <div className="mt-3">{children}</div>}
             </div>
         </div>
     );

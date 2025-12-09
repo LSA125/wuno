@@ -297,11 +297,11 @@ export default function LiveGame({
                         invalid={shake}
                         requiredWords={totalLettersNeeded}
                     >
-                        <div className="d-flex justify-content-between align-items-center text-muted small mb-2">
+                        <RecentWordHistory history={wordHistory} fallbackPrevious={previousWord || ""} />
+                        <div className="d-flex justify-content-between align-items-center text-muted small mt-2">
                             <span>{myTurn ? "You are up now" : `${currentPlayer?.name || `Seat ${turn.seat}`} is playing`}</span>
                             <span>Turn {turn.index + 1} · Wins {currentPlayer?.roundWins ?? 0}</span>
                         </div>
-                        <RecentWordHistory history={wordHistory} fallbackPrevious={previousWord || ""} />
                     </RestrictionTrack>
                     <TurnTimer startedAt={turn.startedAt} dueAt={turn.dueAt} effects={timerEffects} />
                     <div className="flex flex-wrap gap-4 align-items-center">
