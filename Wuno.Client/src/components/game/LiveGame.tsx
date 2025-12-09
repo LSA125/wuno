@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { EffectState, GameState, TurnHistoryState, TurnState } from "@/api/types";
 import EffectChip from "./pieces/EffectChip";
 import RequiredLengthGauge from "./pieces/RequiredLengthGauge";
@@ -118,6 +118,95 @@ export default function LiveGame({
     const myTurn = turn?.seat === meSeat;
     const minLen = turn?.minLen ?? 0;
     const roundIndex = (state.currentRound?.index ?? 0) + 1;
+    const validateWord = useCallback(
+        (word: string): string | null => {
+            const trimmed = word.trim();
+            if (!myTurn) return "Wait for your spotlight.";
+            if (!trimmed) return "Type a word to submit.";
+            const normalized = normalizeWord(trimmed);
+            if (!/^[a-z]+$/i.test(trimmed)) return "Letters only, no symbols.";
+            if (normalized.length < minLen) return `Need at least ${minLen} letters.`;
+            if (!turn.freeStart && requiredStart && normalized[0] !== normalizeWord(requiredStart)[0]) {
+                return `Must start with '${requiredStart.toUpperCase()}'`;
+            }
+            if (reversedPrevious && reverseMatchLength < Math.min(reversedPrevious.length, normalized.length)) {
+                return "Follow the reverse chain to keep the streak alive.";
+            }
+            if (seenWords.has(normalized)) return "That word already appeared this match.";
+            return null;
+        },
+        [myTurn, minLen, requiredStart, reversedPrevious, reverseMatchLength, seenWords, turn?.freeStart]
+    );
+
+    const canSubmit = !ended && validateWord(input) === null;
+
+    useEffect(() => {
+        if (!invalidReason) return;
+        const reason = validateWord(input);
+        if (!reason) {
+            setInvalidReason(null);
+            setShake(false);
+        }
+    }, [input, invalidReason, validateWord]);
+
+    const attemptSubmit = useCallback(() => {
+        const reason = validateWord(input);
+        if (reason) {
+            setInvalidReason(reason);
+            setShake(true);
+            setTimeout(() => setShake(false), 350);
+            return;
+        }
+        const trimmed = input.trim();
+        if (!trimmed) return;
+        onSubmit(trimmed);
+        setSeenWords((prev) => new Set(prev).add(normalizeWord(trimmed)));
+        setInput("");
+        setInvalidReason(null);
+        setShake(false);
+        lastMatchRef.current = 0;
+    }, [input, onSubmit, validateWord]);
+
+    useEffect(() => {
+        if (!myTurn) return;
+        onType(meSeat, input);
+    }, [input, meSeat, myTurn, onType]);
+
+    useEffect(() => {
+        if (!myTurn || ended) return;
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            const target = event.target as HTMLElement;
+            if (
+                target?.tagName.toLowerCase() === "input" ||
+                target?.tagName.toLowerCase() === "textarea" ||
+                target?.isContentEditable
+            ) {
+                return;
+            }
+
+            if (event.key === "Enter") {
+                event.preventDefault();
+                attemptSubmit();
+                return;
+            }
+
+            if (event.key === "Backspace") {
+                event.preventDefault();
+                setInput((prev) => prev.slice(0, -1));
+                return;
+            }
+
+            if (/^[a-z]$/i.test(event.key)) {
+                event.preventDefault();
+                setInput((prev) => `${prev}${event.key}`);
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [attemptSubmit, ended, myTurn]);
+
     if (!turn) {
         return (
             <section className="game-layout">
@@ -142,51 +231,6 @@ export default function LiveGame({
             </section>
         );
     }
-    const validateWord = (word: string): string | null => {
-        const trimmed = word.trim();
-        if (!myTurn) return "Wait for your spotlight.";
-        if (!trimmed) return "Type a word to submit.";
-        const normalized = normalizeWord(trimmed);
-        if (!/^[a-z]+$/i.test(trimmed)) return "Letters only, no symbols.";
-        if (normalized.length < minLen) return `Need at least ${minLen} letters.`;
-        if (!turn.freeStart && requiredStart && normalized[0] !== normalizeWord(requiredStart)[0]) {
-            return `Must start with '${requiredStart.toUpperCase()}'`;
-        }
-        if (reversedPrevious && reverseMatchLength < Math.min(reversedPrevious.length, normalized.length)) {
-            return "Follow the reverse chain to keep the streak alive.";
-        }
-        if (seenWords.has(normalized)) return "That word already appeared this match.";
-        return null;
-    };
-
-    const canSubmit = !ended && validateWord(input) === null;
-
-    useEffect(() => {
-        if (!invalidReason) return;
-        const reason = validateWord(input);
-        if (!reason) {
-            setInvalidReason(null);
-            setShake(false);
-        }
-    }, [input, invalidReason, turn, minLen, myTurn, requiredStart, reverseMatchLength, reversedPrevious, seenWords]);
-
-    const attemptSubmit = () => {
-        const reason = validateWord(input);
-        if (reason) {
-            setInvalidReason(reason);
-            setShake(true);
-            setTimeout(() => setShake(false), 350);
-            return;
-        }
-        const trimmed = input.trim();
-        if (!trimmed) return;
-        onSubmit(trimmed);
-        setSeenWords((prev) => new Set(prev).add(normalizeWord(trimmed)));
-        setInput("");
-        setInvalidReason(null);
-        setShake(false);
-        lastMatchRef.current = 0;
-    };
 
     const activeTyped = typedBySeat[turn.seat] ?? (myTurn ? input : "");
     const totalLettersNeeded = minLen;
@@ -284,45 +328,36 @@ export default function LiveGame({
                     <div className="flex flex-wrap gap-4 align-items-center">
                         <RequiredLengthGauge value={(activeTyped || "").length} min={minLen} />
                         <div className="flex-1 min-w-[260px]">
-                            <label className="form-label fw-semibold" htmlFor="typed-word">
-                                {myTurn ? "Your turn" : "Waiting for your turn"}
-                            </label>
-                            <div className={`input-group input-group-lg ${shake ? "shake" : ""}`}>
-                                <input
-                                    id="typed-word"
-                                    disabled={!myTurn || ended}
-                                    className="form-control shadow-sm"
-                                    placeholder={myTurn ? "Type your chain word…" : "Relax, watch the chain"}
-                                    value={input}
-                                    onChange={(e) => {
-                                        const v = e.target.value;
-                                        setInput(v);
-                                        if (myTurn) onType(meSeat, v);
-                                    }}
-                                    onKeyDown={(e) => {
-                                        if (e.key === "Enter") {
-                                            attemptSubmit();
-                                        }
-                                    }}
-                                />
-                                <button className="btn btn-primary" type="button" disabled={!canSubmit} onClick={attemptSubmit}>
-                                    Submit
-                                </button>
+                            <div className="d-flex justify-content-between align-items-center mb-2">
+                                <span className="fw-semibold">{myTurn ? "Type with your keyboard" : "Waiting for your turn"}</span>
+                                <span className={`badge text-bg-light ${freeStartEffects.length ? "free-flash" : ""}`}>
+                                    {turn.freeStart ? "Free start" : "Chain play"}
+                                </span>
+                            </div>
+                            <div
+                                className={`form-control form-control-lg shadow-sm d-flex justify-content-between align-items-center ${shake ? "shake" : ""}`}
+                            >
+                                <div className="text-muted">Active word</div>
+                                <div className="fw-semibold text-end ms-3 text-truncate" aria-live="polite">
+                                    {myTurn ? input || "Start typing…" : activeTyped || ""}
+                                </div>
                             </div>
                             <div className="d-flex justify-content-between align-items-center mt-2 text-muted small">
                                 <span>
                                     {invalidReason
                                         ? invalidReason
                                         : myTurn
-                                            ? "Press Enter or hit Submit once the chain checks out."
+                                            ? "Type letters anywhere on the page. Backspace deletes; Enter submits."
                                             : "Stay tuned — you’re up soon."}
-                                </span>
-                                <span className={`badge text-bg-light ${freeStartEffects.length ? "free-flash" : ""}`}>
-                                    {turn.freeStart ? "Free start" : "Chain play"}
                                 </span>
                                 {freeStartEffects.length > 0 && (
                                     <EffectChip effect={freeStartEffects[freeStartEffects.length - 1]} subtle />
                                 )}
+                            </div>
+                            <div className="d-flex justify-content-end mt-1">
+                                <button className="btn btn-primary" type="button" disabled={!canSubmit} onClick={attemptSubmit}>
+                                    Submit (Enter)
+                                </button>
                             </div>
                         </div>
                     </div>
