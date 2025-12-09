@@ -24,6 +24,7 @@ export default function GamePage() {
     const [phase, setPhase] = useState<Phase>("waiting");
     const [roundCountdownMs, setRoundCountdownMs] = useState<number | null>(null);
     const [typedBySeat, setTypedBySeat] = useState<Record<number, string>>({});
+    const [submitError, setSubmitError] = useState<{ id: number; reason: string } | null>(null);
     const [wordHistory, setWordHistory] = useState<TurnHistoryState[]>([]);
     const { push } = useToast();
 
@@ -142,11 +143,11 @@ export default function GamePage() {
             setPhase(derivePhaseFromGame(res.state));
         });
 
-            hub.on("ConnectionFailed", (msg: string) => {
-                if (!cancelled) {
-                    push(msg || "Failed to connect to game.");
-                    nav("/lobby", { replace: true });
-                }
+        hub.on("ConnectionFailed", (msg: string) => {
+            if (!cancelled) {
+                push(msg || "Failed to connect to game.");
+                nav("/lobby", { replace: true });
+            }
         });
 
         hub.on("PlayersUpdated", (players: PlayerState[]) => {
@@ -158,6 +159,11 @@ export default function GamePage() {
             if (cancelled) return;
             setRoundCountdownMs(ms);
             setPhase("round-start");
+        });
+
+        hub.on("WordRejected", (reason: string) => {
+            if (cancelled) return;
+            setSubmitError({ id: Date.now(), reason: reason || "Word rejected." });
         });
 
         hub.on("MatchStarted", (g: GameState) => {
@@ -347,6 +353,7 @@ export default function GamePage() {
                     typedBySeat={typedBySeat}
                     onType={onLocalType}
                     onSubmit={submitWord}
+                    submitError={submitError}
                     onLeave={leaveGame}
                     canLeave={!!hubRef.current && hubRef.current.state === "Connected"}
                     ended={phase === "ended"}

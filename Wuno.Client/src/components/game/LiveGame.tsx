@@ -15,6 +15,7 @@ type LiveGameProps = {
     typedBySeat: Record<number, string>;
     onType: (seat: number, word: string) => void;
     onSubmit: (word: string) => void;
+    submitError?: { id: number; reason: string } | null;
     onLeave: () => void;
     canLeave?: boolean;
     ended: boolean;
@@ -28,6 +29,7 @@ export default function LiveGame({
     typedBySeat,
     onType,
     onSubmit,
+    submitError,
     onLeave,
     canLeave = true,
     ended,
@@ -58,6 +60,14 @@ export default function LiveGame({
         setShake(false);
         lastMatchRef.current = 0;
     }, [players, state.currentRound?.roundId, turn?.turnId]);
+
+    useEffect(() => {
+        if (!submitError) return;
+        setInvalidReason(submitError.reason);
+        setShake(true);
+        const id = window.setTimeout(() => setShake(false), 350);
+        return () => clearTimeout(id);
+    }, [submitError]);
 
     useEffect(() => {
         if (!turn) {
@@ -150,6 +160,15 @@ export default function LiveGame({
     };
 
     const canSubmit = !ended && validateWord(input) === null;
+
+    useEffect(() => {
+        if (!invalidReason) return;
+        const reason = validateWord(input);
+        if (!reason) {
+            setInvalidReason(null);
+            setShake(false);
+        }
+    }, [input, invalidReason, turn, minLen, myTurn, requiredStart, reverseMatchLength, reversedPrevious, seenWords]);
 
     const attemptSubmit = () => {
         const reason = validateWord(input);
