@@ -34,6 +34,34 @@ export default function GamePage() {
     const myUserId = useMemo(() => {
         return (user?.userId as string | undefined) || getCookie() || "";
     }, [user]);
+
+    const updateWordHistory = useCallback(
+        (
+            updater:
+                | TurnHistoryState[]
+                | null
+                | undefined
+                | ((prev: TurnHistoryState[]) => TurnHistoryState[] | null | undefined)
+        ) => {
+            const roundIdAtUpdate = roundIdRef.current;
+            setWordHistory(prev => {
+                const safePrev = prev ?? [];
+                if (roundIdAtUpdate && roundIdRef.current !== roundIdAtUpdate) return safePrev;
+
+                const resolved = typeof updater === "function" ? updater(safePrev) : updater;
+                const scopedHistory = resolved ?? [];
+                const dedupedHistory = Array.from(
+                    scopedHistory
+                        .reduce((map, entry) => map.set(entry.turnId, entry), new Map<string, TurnHistoryState>())
+                        .values()
+                );
+
+                return dedupedHistory;
+            });
+        },
+        []
+    );
+
     const leaveGame = async () => {
         if (!state || !hubRef.current) {
             nav("/lobby", { replace: true });
@@ -69,14 +97,13 @@ export default function GamePage() {
         if (!hub || !gameId) return;
         try {
             const history = await hub.invoke<TurnHistoryState[]>("RequestRecentWordHistory", gameId);
-            setWordHistory(history);
+            updateWordHistory(history);
         } catch (err) {
             console.error("Recent history request failed", err);
         }
-    }, []);
+    }, [updateWordHistory]);
     useEffect(() => {
         const beforeUnload = () => {
-            // best-effort: no await (unload), but hub stop is fine
             try { hubRef.current?.invoke("LeaveGame", state?.gameId); } catch { }
             try { hubRef.current?.stop(); } catch { }
         };
@@ -86,9 +113,9 @@ export default function GamePage() {
 
     // Connect + join on mount
     useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
+        let cancelled = false;
+        setPhase("playing"); // for testing
+        (async () => {
         try {
             if (!code) { nav("/", { replace: true }); return; }
             if (!myUserId) {
@@ -110,7 +137,8 @@ export default function GamePage() {
             gameIdRef.current = res.state.gameId;
             lastRoundRef.current = res.state.currentRound?.roundId ?? null;
             roundIdRef.current = res.state.currentRound?.roundId ?? null;
-            setWordHistory([]);
+            updateWordHistory([]);
+            requestRecentHistory();
             setPhase(derivePhaseFromGame(res.state));
         });
 
@@ -145,7 +173,7 @@ export default function GamePage() {
             const nextRoundId = g.currentRound?.roundId ?? null;
             if (roundIdRef.current !== nextRoundId) {
                 roundIdRef.current = nextRoundId;
-                setWordHistory([]);
+                updateWordHistory([]);
                 requestRecentHistory();
             }
         });
@@ -177,16 +205,12 @@ export default function GamePage() {
 
         hub.on("RecentWordHistory", (history: TurnHistoryState[]) => {
             if (cancelled) return;
-            setWordHistory(history);
+            updateWordHistory(history);
         });
 
         hub.on("WordHistoryAppended", (entry: TurnHistoryState) => {
             if (cancelled) return;
-            setWordHistory(prev => {
-                if (prev.some(h => h.turnId === entry.turnId)) return prev;
-                if (roundIdRef.current == null) return [...prev, entry];
-                return [...prev, entry];
-            });
+            updateWordHistory(prev => [...prev, entry]);
         });
 
         hub.on("error", (err: string) => {
@@ -245,9 +269,9 @@ export default function GamePage() {
 
     // Broadcast local typing
     const onLocalType = (seat: number, word: string) => {
-    setTypedBySeat(prev => ({ ...prev, [seat]: word }));
-    if (!hubRef.current) return;
-    hubRef.current.invoke("WordChanged", word).catch(() => {});
+        setTypedBySeat(prev => ({ ...prev, [seat]: word }));
+        if (!hubRef.current) return;
+        hubRef.current.invoke("WordChanged", word).catch(() => {});
     };
 
     // Countdown tick for “round-start”

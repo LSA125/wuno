@@ -116,7 +116,7 @@ export default function LiveGame({
                         <div>
                             <p className="text-uppercase text-muted small mb-1">Round {roundIndex}</p>
                             <h5 className="card-title mb-2">Preparing next turn…</h5>
-                            <p className="text-muted mb-0">Stay limber — the countdown is almost done.</p>
+                            <p className="text-muted mb-0">Be ready - the countdown is almost done.</p>
                         </div>
                         <button type="button" className="btn btn-outline-danger" onClick={onLeave} disabled={!canLeave}>
                             Leave game
@@ -302,7 +302,8 @@ export default function LiveGame({
                                 </span>
                                 {freeStartEffects.length > 0 && (
                                     <EffectChip effect={freeStartEffects[freeStartEffects.length - 1]} subtle />
-                                )}                            </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
