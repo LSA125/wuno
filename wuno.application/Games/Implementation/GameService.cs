@@ -270,6 +270,7 @@ namespace Wuno.Application.Games.Implementation
             {
                 Round round = game.CurrentRound;
                 Player? winner = game.Players.FirstOrDefault(p => p.IsActive && p.IsTaken);
+                game.LastWord = null;
                 round.EndedAt = now;
                 round.WinnerId = winner?.Id;
                 if (winner is not null)
@@ -588,6 +589,7 @@ namespace Wuno.Application.Games.Implementation
             {
                 Round round = game.CurrentRound;
                 Player? winner = game.Players.FirstOrDefault(p => p.IsActive && p.IsTaken);
+                game.LastWord = null;
                 round.EndedAt = now;
                 round.WinnerId = winner?.Id;
                 if (winner is not null)
