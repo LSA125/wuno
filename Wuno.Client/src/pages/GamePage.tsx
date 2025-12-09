@@ -273,12 +273,14 @@ export default function GamePage() {
         }
     };
 
-    // Broadcast local typing
-    const onLocalType = (seat: number, word: string) => {
-        setTypedBySeat(prev => ({ ...prev, [seat]: word }));
-        if (!hubRef.current) return;
-        hubRef.current.invoke("WordChanged", word).catch(() => {});
-    };
+    const onLocalType = useCallback(
+        (seat: number, word: string) => {
+            setTypedBySeat(prev => ({ ...prev, [seat]: word }));
+            if (!hubRef.current) return;
+            hubRef.current.invoke("WordChanged", word).catch(() => { });
+        },
+        []
+    );
 
     // Countdown tick for “round-start”
     useEffect(() => {
