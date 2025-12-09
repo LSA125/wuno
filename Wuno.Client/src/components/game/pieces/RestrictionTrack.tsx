@@ -1,5 +1,4 @@
-import { useMemo } from "react";
-
+import { type ReactNode, useMemo } from "react";
 export type RestrictionTrackProps = {
     minLen: number;
     typedWord: string;
@@ -9,6 +8,7 @@ export type RestrictionTrackProps = {
     reverseMatchLength: number;
     invalid?: boolean;
     requiredWords: number;
+    children?: ReactNode;
 };
 
 const normalizeWord = (word: string) =>
@@ -27,6 +27,7 @@ export default function RestrictionTrack({
     reverseMatchLength,
     invalid = false,
     requiredWords,
+    children,
 }: RestrictionTrackProps) {
     const typed = normalizeWord(typedWord || "");
     const prev = normalizeWord(previousWord || "");
@@ -79,6 +80,7 @@ export default function RestrictionTrack({
                     <span className="dot" aria-hidden="true" />
                     <span>Need at least {requiredWords} letters before submitting.</span>
                 </div>
+                {children && <div className="mt-3">{children}</div>}
             </div>
         </div>
     );

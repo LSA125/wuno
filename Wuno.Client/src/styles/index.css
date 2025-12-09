@@ -392,23 +392,38 @@ body {
     overflow: hidden;
     background: rgba(255, 255, 255, 0.82);
 }
-.recent-words {
+.recent-word-inline {
+    background: linear-gradient(180deg, rgba(13, 110, 253, 0.06), transparent);
     border-radius: 12px;
-    border: 1px solid rgba(13, 110, 253, 0.1);
-    background: rgba(255, 255, 255, 0.92);
-}
-
-.recent-word-list {
-    border-top: 1px solid rgba(0, 0, 0, 0.04);
-    padding-top: 10px;
-}
-
-.recent-word-row {
-    border: 1px dashed rgba(0, 0, 0, 0.06);
-    border-radius: 10px;
     padding: 10px 12px;
-    background: rgba(255, 255, 255, 0.82);
+    border: 1px dashed rgba(13, 110, 253, 0.12);
 }
+
+.recent-word-track {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.history-box {
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 6px;
+    text-align: left;
+    background: rgba(13, 110, 253, 0.06);
+    border-color: rgba(13, 110, 253, 0.2);
+}
+    .history-box .word-preview {
+        gap: 4px;
+    }
+
+    .history-box .word-letter {
+        background: rgba(13, 110, 253, 0.08);
+        border-color: rgba(13, 110, 253, 0.16);
+    }
+
+    .history-box.muted {
+        background: rgba(0, 0, 0, 0.02);
+        border-color: rgba(0, 0, 0, 0.05);
+    }
 .player-group-heading {
     background: rgba(0, 0, 0, 0.02);
     border-bottom: 1px solid rgba(0, 0, 0, 0.05);

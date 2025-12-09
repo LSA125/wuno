@@ -278,8 +278,9 @@ export default function LiveGame({
                         reverseMatchLength={reverseMatchLength}
                         invalid={shake}
                         requiredWords={totalLettersNeeded}
-                    />
-                    <RecentWordHistory history={wordHistory} fallbackPrevious={previousWord || ""} />
+                    >
+                        <RecentWordHistory history={wordHistory} fallbackPrevious={previousWord || ""} />
+                    </RestrictionTrack>
                     <div className="flex flex-wrap gap-4 align-items-center">
                         <RequiredLengthGauge value={(activeTyped || "").length} min={minLen} />
                         <div className="flex-1 min-w-[260px]">
