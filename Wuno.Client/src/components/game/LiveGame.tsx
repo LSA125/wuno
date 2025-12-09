@@ -234,8 +234,18 @@ export default function LiveGame({
     const activeTyped = typedBySeat[turn.seat] ?? (myTurn ? input : "");
     const totalLettersNeeded = minLen;
     const timerEffects = effectEvents.filter((e) => e.type === EffectType.ADD_TIME);
-    const lengthEffects = effectEvents.filter((e) => e.type === EffectType.ADJ_MIN_LEN);
-    const freeStartEffects = effectEvents.filter((e) => e.type === EffectType.FREE_START);
+    const turnContext = turn
+        ? {
+            round: roundIndex,
+            turn: turn.index + 1,
+            seat: turn.seat,
+            playerName: currentPlayer?.name ?? null,
+            requiredLength: totalLettersNeeded,
+            startLetter: requiredStart,
+            freeStart: turn.freeStart,
+            wins: currentPlayer?.roundWins ?? 0,
+        }
+        : null;
 
     if (ended) {
         const winner = [...players].sort((a, b) => b.roundWins - a.roundWins)[0];
@@ -249,7 +259,7 @@ export default function LiveGame({
                         Back to lobby
                     </button>
                 </div>
-                <PlayerSidebar players={players} currentSeat={turn.seat} meSeat={meSeat} />
+                <PlayerSidebar players={players} currentSeat={turn.seat} meSeat={meSeat} turnContext={turnContext ?? undefined} />
             </section>
         );
     }
@@ -260,31 +270,19 @@ export default function LiveGame({
                 <div className="d-flex flex-wrap justify-content-between align-items-start gap-3">
                     <div className="d-flex flex-column gap-1">
                         <p className="text-uppercase text-muted small mb-0">Round {roundIndex}</p>
-                        <div className="d-flex flex-wrap align-items-center gap-2">
-                            <h4 className="mb-0">Turn #{turn.index + 1}</h4>
-                            <span className="badge text-bg-light">Seat {turn.seat}</span>
-                            {currentPlayer?.name && <span className="text-muted small">{currentPlayer.name}</span>}
-                            {myTurn && <span className="badge text-bg-info text-uppercase">You</span>}
-                            {!currentPlayer?.isConnected && (
-                                <span className="badge text-bg-danger d-inline-flex align-items-center gap-1">Offline</span>
-                            )}
-                        </div>
+                        <h4 className="mb-0">Turn #{turn.index + 1}</h4>
+                        {!currentPlayer?.isConnected && <span className="text-danger small">Offline</span>}
                     </div>
                     <div className="d-flex gap-2 align-items-center position-relative">
-                        <span className={`badge text-bg-primary ${lengthEffects.length ? "length-pulse" : ""}`}>
-                            Need {totalLettersNeeded} letters
-                        </span>
-                        {lengthEffects.length > 0 && (
-                            <div className="inline-effect-chip" aria-live="polite">
-                                <EffectChip effect={lengthEffects[lengthEffects.length - 1]} subtle />
-                            </div>
-                        )}
                         <button type="button" className="btn btn-outline-danger" onClick={onLeave} disabled={!canLeave}>
                             Leave game
                         </button>
                     </div>
                 </div>
-
+                <div className="d-flex flex-row justify-content-between">
+                    <TurnTimer startedAt={turn.startedAt} dueAt={turn.dueAt} effects={timerEffects} />
+                    <RequiredLengthGauge value={(activeTyped || "").length} min={minLen} />
+                </div>
                 <div className="d-flex flex-column gap-4 mt-4">
 
                     <RestrictionTrack
@@ -297,51 +295,17 @@ export default function LiveGame({
                         invalid={shake}
                         requiredWords={totalLettersNeeded}
                     >
+                        <span>
+                            {invalidReason
+                                ?? myTurn
+                                    ? "Type letters anywhere on the page. Backspace deletes; Enter submits."
+                                    : "Stay tuned — you’re up soon."}
+                        </span>
                         <RecentWordHistory history={wordHistory} fallbackPrevious={previousWord || ""} />
-                        <div className="d-flex justify-content-end align-items-center text-muted small mt-2">
-                            <span>Turn {turn.index + 1} · Wins {currentPlayer?.roundWins ?? 0}</span>
-                        </div>
                     </RestrictionTrack>
-                    <TurnTimer startedAt={turn.startedAt} dueAt={turn.dueAt} effects={timerEffects} />
-                    <div className="flex flex-wrap gap-4 align-items-center">
-                        <RequiredLengthGauge value={(activeTyped || "").length} min={minLen} />
-                        <div className="flex-1 min-w-[260px]">
-                            <div className="d-flex justify-content-between align-items-center mb-2">
-                                <span className="fw-semibold">{myTurn ? "Type with your keyboard" : "Waiting for your turn"}</span>
-                                <span className={`badge text-bg-light ${freeStartEffects.length ? "free-flash" : ""}`}>
-                                    {turn.freeStart ? "Free start" : "Chain play"}
-                                </span>
-                            </div>
-                            <div
-                                className={`form-control form-control-lg shadow-sm d-flex justify-content-between align-items-center ${shake ? "shake" : ""}`}
-                            >
-                                <div className="text-muted">Active word</div>
-                                <div className="fw-semibold text-end ms-3 text-truncate" aria-live="polite">
-                                    {myTurn ? input || "Start typing…" : activeTyped || ""}
-                                </div>
-                            </div>
-                            <div className="d-flex justify-content-between align-items-center mt-2 text-muted small">
-                                <span>
-                                    {invalidReason
-                                        ? invalidReason
-                                        : myTurn
-                                            ? "Type letters anywhere on the page. Backspace deletes; Enter submits."
-                                            : "Stay tuned — you’re up soon."}
-                                </span>
-                                {freeStartEffects.length > 0 && (
-                                    <EffectChip effect={freeStartEffects[freeStartEffects.length - 1]} subtle />
-                                )}
-                            </div>
-                            <div className="d-flex justify-content-end mt-1">
-                                <button className="btn btn-primary" type="button" disabled={!canSubmit} onClick={attemptSubmit}>
-                                    Submit (Enter)
-                                </button>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
-            <PlayerSidebar players={players} currentSeat={turn.seat} meSeat={meSeat} />
+            <PlayerSidebar players={players} currentSeat={turn.seat} meSeat={meSeat} turnContext={turnContext ?? undefined} />
         </section>
     );
 }
@@ -365,7 +329,7 @@ function TurnTimer({
     const danger = ms < 4000;
     return (
         <div
-            className={`alert ${danger ? "alert-warning" : "alert-secondary"} mb-0 position-relative`}
+            className={`alert ${danger ? "alert-warning" : "alert-secondary"} mb-0 position-relative w-100`}
             aria-live="polite"
             role="status"
             style={{ overflow: "visible" }}
@@ -387,7 +351,6 @@ function TurnTimer({
                         />
                     </div>
                 </div>
-                <span className="badge text-bg-dark">{Math.ceil(totalMs / 1000)}s limit</span>
             </div>
         </div>
     );

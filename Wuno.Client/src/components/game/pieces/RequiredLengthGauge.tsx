@@ -12,7 +12,7 @@ export default function RequiredLengthGauge({ value, min }: { value: number; min
                a 15.9155 15.9155 0 0 1 0 -31.831"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="2"
+                        strokeWidth="1"
                         className="opacity-20"
                     />
                     <path
@@ -21,7 +21,7 @@ export default function RequiredLengthGauge({ value, min }: { value: number; min
                a 15.9155 15.9155 0 0 1 0 -31.831"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="3"
+                        strokeWidth="2"
                         strokeDasharray={`${(pct * 100).toFixed(2)}, 100`}
                         className={`${met ? "text-green-600" : "text-blue-600"} transition-all`}
                     />

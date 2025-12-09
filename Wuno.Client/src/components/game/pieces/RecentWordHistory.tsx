@@ -43,11 +43,6 @@ export default function RecentWordHistory({ history, fallbackPrevious }: RecentW
                         </div>
                     );
                 })}
-                {entries.length === 0 && (
-                    <div className="letter-box history-box muted" role="listitem">
-                        <div className="text-muted small">No words yet this round.</div>
-                    </div>
-                )}
             </div>
         </div>
     );

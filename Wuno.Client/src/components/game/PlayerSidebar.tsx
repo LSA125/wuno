@@ -5,9 +5,19 @@ export type PlayerSidebarProps = {
     players: PlayerState[];
     currentSeat?: number | null;
     meSeat: number;
+    turnContext?: {
+        round: number;
+        turn: number;
+        seat: number;
+        playerName?: string | null;
+        requiredLength: number;
+        startLetter?: string | null;
+        freeStart: boolean;
+        wins: number;
+    };
 };
 
-export default function PlayerSidebar({ players, currentSeat, meSeat }: PlayerSidebarProps) {
+export default function PlayerSidebar({ players, currentSeat, meSeat, turnContext }: PlayerSidebarProps) {
     const ordered = [...players].sort((a, b) => a.seat - b.seat);
     const activePlayers = ordered.filter((p) => p.isActive);
     const inactivePlayers = ordered.filter((p) => !p.isActive);
@@ -18,6 +28,27 @@ export default function PlayerSidebar({ players, currentSeat, meSeat }: PlayerSi
                 <div className="text-uppercase fw-semibold small">{groupLabel}</div>
                 <span className={`badge text-bg-${tone}`}>{list.length} player{list.length === 1 ? "" : "s"}</span>
             </div>
+            {turnContext && (
+                <div className="px-3 pb-3 border-bottom">
+                    <p className="text-uppercase text-muted text-xs mb-1">Current turn</p>
+                    <div className="d-flex flex-column gap-1">
+                        <div className="fw-semibold leading-tight">
+                            {turnContext.playerName || `Seat ${turnContext.seat}`}
+                        </div>
+                        <div className="text-muted text-xs">
+                            Round {turnContext.round} · Turn {turnContext.turn} · Seat {turnContext.seat}
+                        </div>
+                        <div className="text-muted text-xs">
+                            Need {turnContext.requiredLength}+ letters
+                            {!turnContext.freeStart && turnContext.startLetter && `; start with ${turnContext.startLetter.toUpperCase()}`}
+                        </div>
+                        <div className="text-muted text-xs">Wins this match: {turnContext.wins}</div>
+                        <span className={`badge ${turnContext.freeStart ? "text-bg-info" : "text-bg-secondary"}`}>
+                            {turnContext.freeStart ? "Free start" : "Chain play"}
+                        </span>
+                    </div>
+                </div>
+            )}
             <ul className="list-unstyled m-0 p-0 player-roster-list">
                 {list.map((player) => {
                     const isCurrent = currentSeat === player.seat;
