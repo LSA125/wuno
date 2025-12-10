@@ -236,7 +236,7 @@ namespace Wuno.Application.Games.Implementation
                 if (w.Length < currentTurn.MinLen) return new(false, $"Word too short (min {currentTurn.MinLen})", null, null);
                 if (!currentTurn.FreeStart
                     && !game.LastWord.IsNullOrEmpty()
-                    && w.First() == game.LastWord!.Last())
+                    && w.First() != game.LastWord!.Last())
                 {
                     return new(false, $"Word must start with '{game.LastWord!.Last()}'", null, null);
                 }
