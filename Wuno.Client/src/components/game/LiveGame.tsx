@@ -133,9 +133,6 @@ export default function LiveGame({
             if (!turn.freeStart && requiredStart && normalized[0] !== normalizeWord(requiredStart)[0]) {
                 return `Must start with '${requiredStart.toUpperCase()}'`;
             }
-            if (reversedPrevious && reverseMatchLength < Math.min(reversedPrevious.length, normalized.length)) {
-                return "Follow the reverse chain to keep the streak alive.";
-            }
             if (!dictionary.has(normalized)) return "Not in the allowed word list.";
             if (seenWords.has(normalized)) return "That word already appeared this match.";
             return null;
@@ -253,14 +250,42 @@ export default function LiveGame({
         }
         : null;
 
+    const top = (() => {
+        const arr = [...players]
+            .sort((a, b) => b.roundWins - a.roundWins)
+            .slice(0, 3);
+        [arr[0], arr[1]] = [arr[1], arr[0]];
+        return arr;
+    })();
+
     if (ended) {
         const winner = [...players].sort((a, b) => b.roundWins - a.roundWins)[0];
         return (
             <section className="game-layout">
                 <div className="game-panel text-center">
                     <p className="text-uppercase text-muted tracking-wide mb-2">Match finished</p>
-                    <h2 className="display-6 fw-bold mb-3">{winner ? `${winner.name || "Player"} leads the lobby!` : "Game over"}</h2>
-                    <p className="lead mb-4">Kick back or jump into another lobby — everyone sees their final standings on the right.</p>
+                    <h2 className="display-6 fw-bold mb-3">{winner ? `${winner.name || "Player"} Wins!` : "Game over"}</h2>
+                    <div className="card-header">
+                        <h5 className="card-title mb-0">Leaderboard</h5>
+                    </div>
+                    <div className="card-body m-2">
+                        <div className="grid grid-cols-3 gap-3 items-end text-center">
+                            {Array.from({ length: 3 }).map((_, i) => {
+                                let p = top[i];
+                                const podiumH = [24, 32, 20][i]; // mid tallest
+                                const podiumColors = ["bg-gray-300", "bg-amber-400", "bg-amber-600"];
+                                return (
+                                    <div key={i} className="flex flex-col items-center">
+                                        <div className="text-sm mb-2">{p?.name ?? "—"}</div>
+                                        <div className={`w-full bg-base-200 border rounded-t-xl flex items-end justify-center ${podiumColors[i]}`}
+                                            style={{ height: `${podiumH}vh` }}>
+                                            <div className="mb-2 text-2xl font-bold">{p ? p.roundWins : ""}</div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
                     <button type="button" className="btn btn-lg btn-primary px-4" onClick={onLeave}>
                         Back to lobby
                     </button>
@@ -302,10 +327,10 @@ export default function LiveGame({
                         requiredWords={totalLettersNeeded}
                     >
                         <span>
-                            {invalidReason
-                                ?? myTurn
-                                    ? "Type letters anywhere on the page. Backspace deletes; Enter submits."
-                                    : "Stay tuned — you’re up soon."}
+                            {invalidReason ??
+                                (myTurn
+                                    ? "Type letters anywhere on the page."
+                                    : `${turnContext?.playerName ?? "Another player"} is typing`)}
                         </span>
                         <RecentWordHistory history={wordHistory} fallbackPrevious={previousWord || ""} />
                     </RestrictionTrack>
