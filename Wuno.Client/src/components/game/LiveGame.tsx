@@ -98,7 +98,7 @@ export default function LiveGame({
     }, [turn]);
 
     const currentPlayer = players.find((p) => p.seat === turn?.seat);
-    const previousWord = state.lastWord ?? currentPlayer?.lastWord ?? "";
+    const previousWord = state.lastWord ?? "";
     const reversedPrevious = reverseString(normalizeWord(previousWord));
     const normalizedInput = normalizeWord(input);
     const reverseMatchLength = computeReverseMatchLength(normalizedInput, reversedPrevious);
@@ -106,7 +106,7 @@ export default function LiveGame({
 
     // Gentle tone that increases pitch as more letters match the reverse chain
     useEffect(() => {
-        if (!turn || reverseMatchLength <= lastMatchRef.current || !normalizedInput) return;
+        if (!turn ) return;
         const ctx = (audioRef.current ??= new AudioContext());
         const oscillator = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -162,7 +162,6 @@ export default function LiveGame({
         const trimmed = input.trim();
         if (!trimmed) return;
         onSubmit(trimmed);
-        setSeenWords((prev) => new Set(prev).add(normalizeWord(trimmed)));
         setInput("");
         setInvalidReason(null);
         setShake(false);
