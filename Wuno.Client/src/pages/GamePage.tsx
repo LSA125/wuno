@@ -172,6 +172,7 @@ export default function GamePage() {
 
         hub.on("GameUpdated", (g: GameState) => {
             if (cancelled) return;
+            console.log("GameUpdated:\n", g);
             setState(g);
             setPhase(derivePhaseFromGame(g));
             if (g.status !== 0) setRoundCountdownMs(null);
