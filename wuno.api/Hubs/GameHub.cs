@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.SignalR;
+﻿using System;
+using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
 using Wuno.Application.Games.Inheritance;
 using Wuno.Application.Games.Util;
@@ -12,6 +13,9 @@ namespace Wuno.Api.Hubs
         private readonly IGroupTracker _tracker;
         private readonly ITypingGate _typingGate;
         private readonly ITurnTimer _turnTimer;
+        private static DateTime EnsureUtc(DateTime value) => value.Kind == DateTimeKind.Utc
+            ? value
+            : DateTime.SpecifyKind(value, DateTimeKind.Utc);
         public GameHub(IGameService svc, IHubContext<GameHub> hub, IGroupTracker tracker, ITypingGate typingGate, ITurnTimer turnTimer)
         {
             _svc = svc;
@@ -95,7 +99,7 @@ namespace Wuno.Api.Hubs
                     TurnState turn = await _svc.StartMatchAsync(gameId, ct);
                     var state = await _svc.GetGameStateAsync(gameId, ct);
                     await _hub.Clients.Group($"game:{gameId}").SendAsync("GameUpdated", state, ct);
-                    _turnTimer.Schedule(gameId, turn.TurnId, turn.DueAt, BroadcastAfterTimeout);
+                    _turnTimer.Schedule(gameId, turn.TurnId, EnsureUtc(turn.DueAt), BroadcastAfterTimeout);
                 }
                 catch (Exception ex)
                 {
@@ -120,7 +124,7 @@ namespace Wuno.Api.Hubs
                 return;
             }
             _turnTimer.Cancel(turnId);
-            _turnTimer.Schedule(gameId, outcome.State!.CurrentTurn.TurnId, outcome.State.CurrentTurn.DueAt, BroadcastAfterTimeout);
+            _turnTimer.Schedule(gameId, outcome.State!.CurrentTurn.TurnId, EnsureUtc(outcome.State.CurrentTurn.DueAt), BroadcastAfterTimeout);
             if (outcome.CompletedTurn is not null)
             {
                 await _hub.Clients.Group($"game:{gameId}").SendAsync("WordHistoryAppended", outcome.CompletedTurn, ct);
@@ -155,7 +159,7 @@ namespace Wuno.Api.Hubs
             await _hub.Clients.Group($"game:{state.GameId}").SendAsync("GameUpdated", state);
             if (state.Status != wuno.domain.GameStatus.FINISHED)
             {
-                _turnTimer.Schedule(state.GameId, state.CurrentTurn.TurnId,  state.CurrentTurn.DueAt, BroadcastAfterTimeout);
+                _turnTimer.Schedule(state.GameId, state.CurrentTurn.TurnId, EnsureUtc(state.CurrentTurn.DueAt), BroadcastAfterTimeout);
             }
         }
     }
