@@ -10,14 +10,20 @@ namespace Wuno.Application.Games.Util
 {
     public static class State
     {
+        private static DateTime EnsureUtc(DateTime value) => value.Kind == DateTimeKind.Utc
+            ? value
+            : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+
+        private static DateTime? EnsureUtc(DateTime? value) => value is null ? null : EnsureUtc(value.Value);
+
         public static TurnState TurnToState(Turn turn, List<EffectState> effects)
         {
             return new TurnState(
                 turn.Id,
                 turn.Index,
                 turn.Seat,
-                turn.StartedAt,
-                turn.DueAt,
+                EnsureUtc(turn.StartedAt),
+                EnsureUtc(turn.DueAt),
                 turn.MinLen,
                 turn.FreeStart,
                 effects
@@ -29,8 +35,8 @@ namespace Wuno.Application.Games.Util
                 round.Id,
                 round.Index,
                 round.WinnerId,
-                round.StartedAt,
-                round.EndedAt
+                EnsureUtc(round.StartedAt),
+                EnsureUtc(round.EndedAt)
             );
         }
         public static PlayerState PlayerToState(Player player)
