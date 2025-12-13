@@ -1,5 +1,5 @@
 import type { PlayerState } from "@/api/types";
-
+import DefaultAvatar from "@/assets/avatar.svg";
 type PlayerTypingRowProps = {
     player: PlayerState;
     typed: string;
@@ -17,7 +17,7 @@ export default function PlayerTypingRow({ player, typed, isActiveSeat, isViewer 
             style={isViewer ? { boxShadow: "0 0 0 2px rgba(13,110,253,.3)" } : undefined}
         >
             <img
-                src={player.iconUrl || "/avatar.svg"}
+                src={player.iconUrl || DefaultAvatar}
                 className="rounded-circle border flex-shrink-0"
                 width={44}
                 height={44}
