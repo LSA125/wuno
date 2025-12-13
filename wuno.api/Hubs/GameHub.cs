@@ -95,7 +95,7 @@ namespace Wuno.Api.Hubs
                     TurnState turn = await _svc.StartMatchAsync(gameId, ct);
                     var state = await _svc.GetGameStateAsync(gameId, ct);
                     await _hub.Clients.Group($"game:{gameId}").SendAsync("GameUpdated", state, ct);
-                    _turnTimer.Schedule(gameId, turn.TurnId, turn.DueAt, BroadcastAfterTimeout);
+                    _turnTimer.Schedule(gameId, turn.TurnId, EnsureUtc(turn.DueAt), BroadcastAfterTimeout);
                 }
                 catch (Exception ex)
                 {
@@ -120,7 +120,7 @@ namespace Wuno.Api.Hubs
                 return;
             }
             _turnTimer.Cancel(turnId);
-            _turnTimer.Schedule(gameId, outcome.State!.CurrentTurn.TurnId, outcome.State.CurrentTurn.DueAt, BroadcastAfterTimeout);
+            _turnTimer.Schedule(gameId, outcome.State!.CurrentTurn.TurnId, EnsureUtc(outcome.State.CurrentTurn.DueAt), BroadcastAfterTimeout);
             if (outcome.CompletedTurn is not null)
             {
                 await _hub.Clients.Group($"game:{gameId}").SendAsync("WordHistoryAppended", outcome.CompletedTurn, ct);
@@ -155,8 +155,10 @@ namespace Wuno.Api.Hubs
             await _hub.Clients.Group($"game:{state.GameId}").SendAsync("GameUpdated", state);
             if (state.Status != wuno.domain.GameStatus.FINISHED)
             {
-                _turnTimer.Schedule(state.GameId, state.CurrentTurn.TurnId,  state.CurrentTurn.DueAt, BroadcastAfterTimeout);
+                _turnTimer.Schedule(state.GameId, state.CurrentTurn.TurnId, EnsureUtc(state.CurrentTurn.DueAt), BroadcastAfterTimeout);
             }
         }
+
+        private static DateTime EnsureUtc(DateTime dt) => DateTime.SpecifyKind(dt, DateTimeKind.Utc);
     }
 }

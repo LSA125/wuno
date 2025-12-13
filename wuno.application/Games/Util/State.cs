@@ -12,12 +12,14 @@ namespace Wuno.Application.Games.Util
     {
         public static TurnState TurnToState(Turn turn, List<EffectState> effects)
         {
+            var startedAt = DateTime.SpecifyKind(turn.StartedAt, DateTimeKind.Utc);
+            var dueAt = DateTime.SpecifyKind(turn.DueAt, DateTimeKind.Utc);
             return new TurnState(
                 turn.Id,
                 turn.Index,
                 turn.Seat,
-                turn.StartedAt,
-                turn.DueAt,
+                startedAt,
+                dueAt,
                 turn.MinLen,
                 turn.FreeStart,
                 effects
@@ -25,12 +27,14 @@ namespace Wuno.Application.Games.Util
         }
         public static RoundState RoundToState(Round round)
         {
+            DateTime? startedAt = round.StartedAt is null ? null : DateTime.SpecifyKind(round.StartedAt.Value, DateTimeKind.Utc);
+            DateTime? endedAt = round.EndedAt is null ? null : DateTime.SpecifyKind(round.EndedAt.Value, DateTimeKind.Utc);
             return new RoundState(
                 round.Id,
                 round.Index,
                 round.WinnerId,
-                round.StartedAt,
-                round.EndedAt
+                startedAt,
+                endedAt
             );
         }
         public static PlayerState PlayerToState(Player player)
