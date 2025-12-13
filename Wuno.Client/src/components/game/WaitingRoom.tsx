@@ -1,5 +1,5 @@
 import type { PlayerState } from "@/api/types";
-
+import DefaultAvatar from "@/assets/DefaultAvatar.svg"
 export default function WaitingRoom({
     players,
     mePlayerId,
@@ -27,7 +27,7 @@ export default function WaitingRoom({
                         >
                             <div className="d-flex align-items-center gap-3">
                                 <img
-                                    src={p.iconUrl || "/avatar.svg"}
+                                    src={p.iconUrl || DefaultAvatar}
                                     alt={p.name ? `${p.name} avatar` : "Player avatar"}
                                     className="rounded-circle border flex-shrink-0"
                                     style={{
@@ -55,7 +55,6 @@ export default function WaitingRoom({
                                 >
                                     {p.isActive ? "Ready" : "Not ready"}
                                 </span>
-                                <span className="badge text-bg-light">Seat {p.seat}</span>
                             </div>
                         </li>
                     ))}

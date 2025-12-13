@@ -24,11 +24,12 @@ namespace Wuno.Application.Games.Implementation
             if(delay < TimeSpan.Zero) delay = TimeSpan.Zero;
 
             var cts = new CancellationTokenSource();
-            if(!_map.TryAdd(turnId, cts))
+            if (_map.TryRemove(turnId, out var existing))
             {
-                cts.Dispose();
-                return false;
+                try { existing.Cancel(); }
+                finally { existing.Dispose(); }
             }
+            _map[turnId] = cts;
             _ = RunTimerAsync(gameId, turnId, delay, Broadcast, cts);
             return true;
         }

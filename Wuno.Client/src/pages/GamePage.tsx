@@ -9,6 +9,7 @@ import LiveGame from "@/components/game/LiveGame";
 import { createGameHub } from "@/hub/connection";
 import { setPendingJoin } from "@/utils/pendingJoin";
 import { useToast } from "@/context/ToastContext";
+import { Console } from "node:console";
 
 type Phase = "waiting" | "round-start" | "playing" | "ended";
 
@@ -172,7 +173,7 @@ export default function GamePage() {
 
         hub.on("GameUpdated", (g: GameState) => {
             if (cancelled) return;
-            console.log("GameUpdated:\n", g);
+            console.log("GameUpdated received", g);
             setState(g);
             setPhase(derivePhaseFromGame(g));
             if (g.status !== 0) setRoundCountdownMs(null);

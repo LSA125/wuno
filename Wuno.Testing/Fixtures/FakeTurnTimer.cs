@@ -12,7 +12,11 @@ namespace Wuno.Testing.Fixtures
 
         public bool Schedule(Guid gameId, Guid turnId, DateTime dueAtUTC, Func<GameState, Task> Broadcast)
         {
-            return _scheduled.TryAdd(turnId, new ScheduledTurn(gameId, turnId, dueAtUTC, Broadcast));
+            _scheduled.AddOrUpdate(turnId,
+                _ => new ScheduledTurn(gameId, turnId, dueAtUTC, Broadcast),
+                (_, existing) => new ScheduledTurn(gameId, turnId, dueAtUTC, Broadcast));
+
+            return true;
         }
 
         public void Cancel(Guid turnId)

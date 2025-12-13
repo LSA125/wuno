@@ -7,7 +7,7 @@ import { clearCookie } from "@/auth/cookies";
 import { useToast } from "@/context/ToastContext";
 import { useNavigate } from "react-router-dom";
 import { Auth } from "@/api/client";
-
+import DefaultAvatar from "@/assets/DefaultAvatar.svg"
 export default function ProfileCard() {
     const { user, setUser } = useUser();
     const [showEditAnon, setShowEditAnon] = useState(false);
@@ -47,7 +47,7 @@ export default function ProfileCard() {
                 <h5 className="card-title">Your Profile</h5>
                 {user?.iconUrl && (
                     <div className="mb-3">
-                        <img src={user.iconUrl} alt="icon" className="rounded-circle border" width={72} height={72} />
+                        <img src={user.iconUrl || DefaultAvatar} alt="icon" className="rounded-circle border" width={72} height={72} />
                     </div>
                 )}
                 <dl className="mb-4">
