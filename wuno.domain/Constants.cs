@@ -10,8 +10,8 @@ namespace wuno.domain
     {
         public const int DEFAULT_START_LEN = 1;
         public const int DEFAULT_TIME_DECREASE_PER_TURN_SEC = 5;
-        public const int MIN_TURN_DUR_SEC = 5;
-        public const int MAX_TURN_DUR_SEC = 120;
+        public const int MIN_TURN_DUR_SEC = 3;
+        public const int MAX_TURN_DUR_SEC = 40;
         public const int DEFAULT_TURN_DUR_SEC = 30;
         public const int LOW_TIME_ADJ_SEC = 5;
         public const int MID_TIME_ADJ_SEC = 20;

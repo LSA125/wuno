@@ -57,7 +57,7 @@ namespace wuno.domain.Rules
     public record Constraints(char? StartLetter, int MinLen, int DurationSec, bool Require2Vowels, bool FreeStart)
     {
         public static Constraints Base(char? start, int turnNumber, string? lastWord) => 
-            new(start, lastWord?.Length ?? Constants.DEFAULT_START_LEN, 
+            new(start, turnNumber + Constants.DEFAULT_START_LEN, 
                 Math.Clamp(Constants.DEFAULT_TURN_DUR_SEC - Constants.DEFAULT_TIME_DECREASE_PER_TURN_SEC * turnNumber,
                     Constants.MIN_TURN_DUR_SEC,
                     Constants.MAX_TURN_DUR_SEC), 
