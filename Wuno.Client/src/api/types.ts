@@ -14,6 +14,7 @@ export type PlayerState = {
     iconUrl?: string | null;
     roundWins: number;
     lastWord?: string | null;
+    remainingTime: number;
 };
 
 export type EffectState = { type: number; value: number };

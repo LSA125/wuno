@@ -59,6 +59,7 @@ namespace Wuno.Application.Games.Implementation
                 p.IsActive = p.IsTaken;
                 p.LastWord = null;
                 p.TurnsPlayedThisRound = 0;
+                p.RemainingTime = Constants.INITIAL_REMAINING_TIME_SEC;
             }
         }
         public async Task<NewGameResponse> StartNewGameAsync(NewGameRequest req, CancellationToken ct)
@@ -233,6 +234,8 @@ namespace Wuno.Application.Games.Implementation
                 currentTurn.EndReason = TurnEndReason.TIMEOUT;
                 player.IsActive = false;
                 player.TurnsPlayedThisRound += 1;
+                // Reset remaining time on timeout
+                player.RemainingTime = 0;
             }
             else
             {
@@ -249,6 +252,11 @@ namespace Wuno.Application.Games.Implementation
 
                 // Calculate score based on reverse match with opponent's last word
                 wordScore = LetterScoring.CalculateScore(w, game.LastWord);
+
+                // Calculate remaining time: actual time left + bonus from score
+                double actualTimeRemaining = Math.Max(0, (currentTurn.DueAt - now).TotalSeconds);
+                var (timeBonus, _) = EffectsLogic.CalculateBonuses(wordScore);
+                player.RemainingTime = actualTimeRemaining + timeBonus;
 
                 currentTurn.Word = w;
                 currentTurn.Score = wordScore;
@@ -328,12 +336,12 @@ namespace Wuno.Application.Games.Implementation
         }
         public async Task<List<PlayerState>> GetPlayersAsync(Guid gameId, CancellationToken ct)
         {
-            return await _db.Players
+            var players = await _db.Players
               .Where(p => p.GameId == gameId && p.IsTaken)
               .OrderBy(p => p.Seat)
               .AsNoTracking()
-              .Select(p => new PlayerState(p.Id, p.Seat, p.IsActive, p.IsConnected, p.Name, p.IconUrl, p.RoundWins, p.LastWord))
               .ToListAsync(ct);
+            return players.Select(State.PlayerToState).ToList();
         }
         public async Task<GameState> GetGameStateAsync(Guid gameId, CancellationToken ct)
         {

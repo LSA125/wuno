@@ -63,6 +63,7 @@ namespace wuno.domain
         public int RoundWins { get; set; }
         public int TurnsPlayedThisRound { get; set; }
         public string? LastWord { get; set; }
+        public double RemainingTime { get; set; } = Constants.INITIAL_REMAINING_TIME_SEC;
     }
 
     public sealed class  Round

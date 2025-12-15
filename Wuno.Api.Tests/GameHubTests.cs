@@ -20,7 +20,7 @@ namespace Wuno.Api.Tests
             var initialTurn = Guid.NewGuid();
             var nextTurn = Guid.NewGuid();
             var service = FakeGameService.ForTurn(new ProcessTurnOutcome(true, null, new GameState(Guid.NewGuid(), wuno.domain.GameStatus.ACTIVE, 0, 1, 2, null,
-                [new PlayerState(Guid.NewGuid(), 0, true, true, "p1", null, 0, null)],
+                [new PlayerState(Guid.NewGuid(), 0, true, true, "p1", null, 0, null, 30)],
                 new RoundState(Guid.NewGuid(), 0, null, DateTime.UtcNow, null),
                 new TurnState(nextTurn, 1, 0, DateTime.UtcNow, DateTime.UtcNow.AddSeconds(5), 1, 0)), null));
             var hub = CreateHub(service, tracker, turnTimer, hubContext, clients, userId: Guid.NewGuid());
