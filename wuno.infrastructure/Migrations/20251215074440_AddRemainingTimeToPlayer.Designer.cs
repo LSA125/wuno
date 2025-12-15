@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using wuno.infrastructure;
 
@@ -11,9 +12,11 @@ using wuno.infrastructure;
 namespace Wuno.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251215074440_AddRemainingTimeToPlayer")]
+    partial class AddRemainingTimeToPlayer
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -46,7 +49,7 @@ namespace Wuno.Infrastructure.Migrations
                     b.HasIndex("UserId", "TokenHash")
                         .IsUnique();
 
-                    b.ToTable("EmailVerificationTokens", (string)null);
+                    b.ToTable("EmailVerificationTokens");
                 });
 
             modelBuilder.Entity("wuno.domain.Game", b =>
@@ -93,7 +96,7 @@ namespace Wuno.Infrastructure.Migrations
 
                     b.HasIndex("CurrentTurnId");
 
-                    b.ToTable("Games", (string)null);
+                    b.ToTable("Games");
                 });
 
             modelBuilder.Entity("wuno.domain.Player", b =>
@@ -148,7 +151,7 @@ namespace Wuno.Infrastructure.Migrations
                     b.HasIndex("GameId", "Seat")
                         .IsUnique();
 
-                    b.ToTable("Players", (string)null);
+                    b.ToTable("Players");
                 });
 
             modelBuilder.Entity("wuno.domain.Round", b =>
@@ -176,7 +179,7 @@ namespace Wuno.Infrastructure.Migrations
 
                     b.HasIndex("GameId", "Index");
 
-                    b.ToTable("Rounds", (string)null);
+                    b.ToTable("Rounds");
                 });
 
             modelBuilder.Entity("wuno.domain.Turn", b =>
@@ -226,7 +229,7 @@ namespace Wuno.Infrastructure.Migrations
                         .IsUnique()
                         .HasFilter("[RoundId] IS NOT NULL AND [Word] IS NOT NULL AND [Word] <> ''");
 
-                    b.ToTable("Turns", (string)null);
+                    b.ToTable("Turns");
                 });
 
             modelBuilder.Entity("wuno.domain.User", b =>
@@ -278,7 +281,7 @@ namespace Wuno.Infrastructure.Migrations
                         .IsUnique()
                         .HasFilter("[NameNormalized] IS NOT NULL AND [NameNormalized] <> ''");
 
-                    b.ToTable("Users", (string)null);
+                    b.ToTable("Users");
                 });
 
             modelBuilder.Entity("wuno.domain.EmailVerificationToken", b =>

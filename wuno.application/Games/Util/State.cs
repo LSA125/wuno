@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using wuno.domain;
+using wuno.domain.Rules;
 
 namespace Wuno.Application.Games.Util
 {
@@ -43,6 +44,10 @@ namespace Wuno.Application.Games.Util
         }
         public static PlayerState PlayerToState(Player player)
         {
+            // Cap remaining time by the max time for this player's upcoming turn
+            int maxTime = EffectsLogic.CalculateMaxTime(player.TurnsPlayedThisRound, isFirstTurn: false);
+            double cappedRemainingTime = Math.Min(player.RemainingTime, maxTime);
+            
             return new PlayerState(
                 player.Id,
                 player.Seat,
@@ -51,7 +56,8 @@ namespace Wuno.Application.Games.Util
                 player.Name,
                 player.IconUrl,
                 player.RoundWins,
-                player.LastWord
+                player.LastWord,
+                cappedRemainingTime
             );
         }
         public static GameState GameToState(Game game,

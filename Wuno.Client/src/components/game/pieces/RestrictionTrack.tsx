@@ -1,4 +1,6 @@
 import { type ReactNode, useMemo } from "react";
+import { getLetterValue } from "@/utils/letterScoring";
+
 export type RestrictionTrackProps = {
     minLen: number;
     typedWord: string;
@@ -62,10 +64,23 @@ export default function RestrictionTrack({
                         else if (pending) stateClass += " pending";
                         else if (active) stateClass += " ghost";
 
+                        // Calculate points for this position
+                        const displayChar = typedChar || prevChar || "";
+                        const multiplier = idx + 1;
+                        const pointValue = displayChar ? getLetterValue(displayChar) : 0;
+
                         return (
                             <div key={idx} className={stateClass} data-letter-index={idx} aria-label={`Letter slot ${idx + 1}`}>
+                                {/* Multiplier badge above */}
+                                <span className="letter-multiplier">×{multiplier}</span>
+
+                                {/* Main letter */}
                                 <span className="letter-main">{typedChar || requirementLetter || prevChar || "·"}</span>
-                                {prevChar && <span className="letter-hint">{prevChar}</span>}
+
+                                {/* Point value below */}
+                                {displayChar && (
+                                    <span className="letter-points">{pointValue}pt</span>
+                                )}
                             </div>
                         );
                     })}

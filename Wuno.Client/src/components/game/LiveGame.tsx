@@ -7,6 +7,9 @@ import RecentWordHistory from "./pieces/RecentWordHistory";
 import { computeReverseMatchLength, normalizeWord, reverseString } from "@/utils/wordMatching";
 import TurnTimer from "./pieces/TurnTimer";
 import wordListText from "@/assets/words.txt?raw";
+import { playErrorSound, playSuccessSound, playTurnStartSound, startTickingSound, stopTickingSound, playMatchSound } from "@/utils/sounds";
+import { getLetterValue } from "@/utils/letterScoring";
+import { TIME_BONUS_MULTIPLIER, SCORE_DIVISOR } from "@/constants";
 
 type LiveGameProps = {
     state: GameState;
@@ -42,7 +45,7 @@ export default function LiveGame({
     const [shake, setShake] = useState(false);
     const [seenWords, setSeenWords] = useState<Set<string>>(new Set());
     const lastMatchRef = useRef(0);
-    const audioRef = useRef<AudioContext | null>(null);
+    const prevTurnIdRef = useRef<string | null>(null);
 
     const dictionary = useMemo(
         () => new Set(wordListText.split(/\r?\n/).map(normalizeWord).filter(Boolean)),
@@ -75,25 +78,52 @@ export default function LiveGame({
     const normalizedInput = normalizeWord(input);
     const reverseMatchLength = computeReverseMatchLength(normalizedInput, reversedPrevious);
     const requiredStart = previousWord ? previousWord.slice(-1) : null;
-
-    // Gentle tone that increases pitch as more letters match the reverse chain
-    useEffect(() => {
-        if (!turn) return;
-        const ctx = (audioRef.current ??= new AudioContext());
-        const oscillator = ctx.createOscillator();
-        const gain = ctx.createGain();
-        oscillator.type = "sine";
-        oscillator.frequency.value = 260 + reverseMatchLength * 35;
-        gain.gain.value = 0.05;
-        oscillator.connect(gain).connect(ctx.destination);
-        oscillator.start();
-        oscillator.stop(ctx.currentTime + 0.15);
-        lastMatchRef.current = reverseMatchLength;
-    }, [reverseMatchLength, normalizedInput, turn]);
-
     const myTurn = turn?.seat === meSeat;
     const minLen = turn?.minLen ?? 0;
     const roundIndex = (state.currentRound?.index ?? 0) + 1;
+
+    // Calculate potential score and bonus time from current word
+    const potentialScore = useMemo(() => {
+        if (!normalizedInput || reverseMatchLength === 0) return 0;
+        let score = 0;
+        for (let i = 0; i < reverseMatchLength && i < normalizedInput.length; i++) {
+            score += getLetterValue(normalizedInput[i]) * (i + 1);
+        }
+        return score;
+    }, [normalizedInput, reverseMatchLength]);
+
+    // Bonus time = score * TIME_BONUS_MULTIPLIER (same as backend logic)
+    const bonusSeconds = potentialScore * TIME_BONUS_MULTIPLIER;
+    // Min length reduction = score / SCORE_DIVISOR
+    const potentialMinLenReduction = Math.floor(potentialScore / SCORE_DIVISOR);
+
+    // Play turn start sound and start ticking when it's my turn
+    useEffect(() => {
+        if (ended || !turn) {
+            stopTickingSound();
+            prevTurnIdRef.current = null;
+            return;
+        }
+        
+        const isNewTurn = prevTurnIdRef.current !== turn.turnId;
+        prevTurnIdRef.current = turn.turnId;
+        
+        if (myTurn && isNewTurn) {
+            playTurnStartSound();
+            startTickingSound();
+        } else if (!myTurn) {
+            stopTickingSound();
+        }
+        
+        return () => stopTickingSound();
+    }, [turn?.turnId, myTurn, ended]);
+
+    // Play match sound when reverse match length changes
+    useEffect(() => {
+        if (!turn || reverseMatchLength <= lastMatchRef.current) return;
+        playMatchSound(reverseMatchLength);
+        lastMatchRef.current = reverseMatchLength;
+    }, [reverseMatchLength, turn]);
     const validateWord = useCallback(
         (word: string): string | null => {
             const trimmed = word.trim();
@@ -128,11 +158,13 @@ export default function LiveGame({
         if (reason) {
             setInvalidReason(reason);
             setShake(true);
+            playErrorSound();
             setTimeout(() => setShake(false), 350);
             return;
         }
         const trimmed = input.trim();
         if (!trimmed) return;
+        playSuccessSound();
         onSubmit(trimmed);
         setInput("");
         setInvalidReason(null);
@@ -172,6 +204,19 @@ export default function LiveGame({
 
             if (/^[a-z]$/i.test(event.key)) {
                 event.preventDefault();
+                const newLetter = event.key.toLowerCase();
+                
+                // Block wrong first letter
+                if (input.length === 0 && requiredStart) {
+                    const requiredLower = normalizeWord(requiredStart).toLowerCase();
+                    if (newLetter !== requiredLower) {
+                        playErrorSound();
+                        setShake(true);
+                        setTimeout(() => setShake(false), 350);
+                        return;
+                    }
+                }
+                
                 setInput((prev) => `${prev}${event.key}`);
             }
         };
@@ -211,7 +256,6 @@ export default function LiveGame({
         ? {
             round: roundIndex,
             turn: turn.index + 1,
-            seat: turn.seat,
             playerName: currentPlayer?.name ?? null,
             requiredLength: totalLettersNeeded,
             startLetter: requiredStart,
@@ -259,7 +303,7 @@ export default function LiveGame({
                         Back to lobby
                     </button>
                 </div>
-                <PlayerSidebar players={players} currentSeat={turn.seat} meSeat={meSeat} turnContext={turnContext ?? undefined} />
+                <PlayerSidebar players={players} currentSeat={turn.seat} meSeat={meSeat} turnDueAt={turn.dueAt} turnContext={turnContext ?? undefined} />
             </section>
         );
     }
@@ -279,9 +323,18 @@ export default function LiveGame({
                         </button>
                     </div>
                 </div>
-                <div className="d-flex flex-row justify-content-between">
-                    <TurnTimer startedAt={turn.startedAt} dueAt={turn.dueAt} />
-                    <RequiredLengthGauge value={(activeTyped || "").length} min={minLen} />
+                <div className="d-flex flex-row justify-content-between gap-3">
+                    <TurnTimer 
+                        startedAt={turn.startedAt} 
+                        dueAt={turn.dueAt} 
+                        bonusSeconds={myTurn ? bonusSeconds : 0}
+                        potentialScore={myTurn ? potentialScore : 0}
+                    />
+                    <RequiredLengthGauge 
+                        value={(activeTyped || "").length} 
+                        min={minLen} 
+                        potentialMinLen={myTurn ? Math.max(0, minLen - potentialMinLenReduction) : minLen}
+                    />
                 </div>
                 <div className="d-flex flex-column gap-4 mt-4">
 
@@ -294,17 +347,20 @@ export default function LiveGame({
                         invalid={shake}
                         requiredWords={totalLettersNeeded}
                     >
-                        <span>
-                            {invalidReason ??
-                                (myTurn
+                        {invalidReason ? (
+                            <div className="invalid-reason">{invalidReason}</div>
+                        ) : (
+                            <span className="text-muted">
+                                {myTurn
                                     ? "Type letters anywhere on the page."
-                                    : `${turnContext?.playerName ?? "Another player"} is typing`)}
-                        </span>
-                        <RecentWordHistory history={wordHistory} fallbackPrevious={previousWord || ""} />
+                                    : `${turnContext?.playerName ?? "Another player"} is typing`}
+                            </span>
+                        )}
+                        <RecentWordHistory history={wordHistory} fallbackPrevious={previousWord || ""} players={players} />
                     </RestrictionTrack>
                 </div>
             </div>
-            <PlayerSidebar players={players} currentSeat={turn.seat} meSeat={meSeat} turnContext={turnContext ?? undefined} />
+            <PlayerSidebar players={players} currentSeat={turn.seat} meSeat={meSeat} turnDueAt={turn.dueAt} turnContext={turnContext ?? undefined} />
         </section>
     );
 }
