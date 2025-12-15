@@ -1,5 +1,4 @@
 import type { TurnHistoryState } from "@/api/types";
-import EffectChip from "./EffectChip";
 import WordPreview from "./WordPreview";
 
 export type RecentWordHistoryProps = {
@@ -31,13 +30,11 @@ export default function RecentWordHistory({ history, fallbackPrevious }: RecentW
                                 minLen={entry.minLen}
                                 compact
                                 label={`Word from seat ${entry.seat}`}
-                                effects={[]}
+                                score={entry.score}
                             />
-                            {entry.effects.length > 0 && (
-                                <div className="recent-effect-list" aria-label="Applied effects">
-                                    {entry.effects.map((effect, i) => (
-                                        <EffectChip key={`${entry.turnId}-${i}`} effect={effect} subtle compact />
-                                    ))}
+                            {entry.score > 0 && (
+                                <div className="recent-score-badge" aria-label="Word score">
+                                    <span className="badge bg-success">+{entry.score} pts</span>
                                 </div>
                             )}
                         </div>

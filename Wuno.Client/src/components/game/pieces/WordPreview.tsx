@@ -1,6 +1,4 @@
-import type { EffectState } from "@/api/types";
 import { computeReverseMatchLength, normalizeWord, reverseString } from "@/utils/wordMatching";
-import EffectChip from "./EffectChip";
 
 type WordPreviewProps = {
     word: string;
@@ -9,7 +7,7 @@ type WordPreviewProps = {
     reverseMatchLength?: number;
     compact?: boolean;
     label?: string;
-    effects?: EffectState[];
+    score?: number;
 };
 
 export default function WordPreview({
@@ -19,7 +17,7 @@ export default function WordPreview({
     reverseMatchLength,
     compact = false,
     label,
-    effects = [],
+    score = 0,
 }: WordPreviewProps) {
     const normalized = normalizeWord(word);
     const letters = normalized.toUpperCase().split("");
@@ -49,11 +47,9 @@ export default function WordPreview({
                     );
                 })}
             </div>
-            {effects.length > 0 && (
-                <div className="d-flex flex-wrap gap-1 mt-1" aria-label="Applied effects">
-                    {effects.map((effect, idx) => (
-                        <EffectChip key={`${effect.type}-${idx}`} effect={effect} subtle />
-                    ))}
+            {score > 0 && (
+                <div className="d-flex flex-wrap gap-1 mt-1" aria-label="Word score">
+                    <span className="badge bg-success small">+{score} pts</span>
                 </div>
             )}
         </div>

@@ -139,7 +139,7 @@ public sealed class GameServiceTests
             .AddPlayer(new PlayerBuilder().AtSeat(1))
             .AddPlayer(new PlayerBuilder().AtSeat(2))
             .AddRound(new RoundBuilder().WithIndex(0))
-            .AddTurn(new TurnBuilder().WithIndex(0).AtSeat(1).FreeStart())
+            .AddTurn(new TurnBuilder().WithIndex(0).AtSeat(1))
             .AddRound(new RoundBuilder().WithIndex(0))
             .CurrentSeat(1)
             .Build();

@@ -3,7 +3,6 @@ import type { GameState, TurnHistoryState, TurnState } from "@/api/types";
 import RequiredLengthGauge from "./pieces/RequiredLengthGauge";
 import PlayerSidebar from "./PlayerSidebar";
 import RestrictionTrack from "./pieces/RestrictionTrack";
-import { EffectType, EffectEvent } from "./pieces/effectTypes";
 import RecentWordHistory from "./pieces/RecentWordHistory";
 import { computeReverseMatchLength, normalizeWord, reverseString } from "@/utils/wordMatching";
 import TurnTimer from "./pieces/TurnTimer";
@@ -42,10 +41,7 @@ export default function LiveGame({
     const [invalidReason, setInvalidReason] = useState<string | null>(null);
     const [shake, setShake] = useState(false);
     const [seenWords, setSeenWords] = useState<Set<string>>(new Set());
-    const [effectEvents, setEffectEvents] = useState<EffectEvent[]>([]);
     const lastMatchRef = useRef(0);
-    const lastTurnIdRef = useRef<string | null>(null);
-    const lastEffectCountRef = useRef(0);
     const audioRef = useRef<AudioContext | null>(null);
 
     const dictionary = useMemo(
@@ -73,40 +69,16 @@ export default function LiveGame({
         return () => clearTimeout(id);
     }, [submitError]);
 
-    useEffect(() => {
-        if (!turn) {
-            setEffectEvents([]);
-            lastEffectCountRef.current = 0;
-            lastTurnIdRef.current = null;
-            return;
-        }
-
-        const sameTurn = lastTurnIdRef.current === turn.turnId;
-        const baseline = sameTurn ? lastEffectCountRef.current : 0;
-        const newEffects = turn.effects.slice(baseline);
-
-        newEffects.forEach((effect, idx) => {
-            const id = Number(`${Date.now()}${idx}`);
-            setEffectEvents((prev) => [...prev, { ...effect, id }]);
-            setTimeout(() => {
-                setEffectEvents((prev) => prev.filter((e) => e.id !== id));
-            }, 2000);
-        });
-
-        lastTurnIdRef.current = turn.turnId;
-        lastEffectCountRef.current = turn.effects.length;
-    }, [turn]);
-
     const currentPlayer = players.find((p) => p.seat === turn?.seat);
     const previousWord = state.lastWord ?? "";
     const reversedPrevious = reverseString(normalizeWord(previousWord));
     const normalizedInput = normalizeWord(input);
     const reverseMatchLength = computeReverseMatchLength(normalizedInput, reversedPrevious);
-    const requiredStart = !turn?.freeStart && previousWord ? previousWord.slice(-1) : null;
+    const requiredStart = previousWord ? previousWord.slice(-1) : null;
 
     // Gentle tone that increases pitch as more letters match the reverse chain
     useEffect(() => {
-        if (!turn ) return;
+        if (!turn) return;
         const ctx = (audioRef.current ??= new AudioContext());
         const oscillator = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -130,14 +102,14 @@ export default function LiveGame({
             const normalized = normalizeWord(trimmed);
             if (!/^[a-z]+$/i.test(trimmed)) return "Letters only, no symbols.";
             if (normalized.length < minLen) return `Need at least ${minLen} letters.`;
-            if (!turn.freeStart && requiredStart && normalized[0] !== normalizeWord(requiredStart)[0]) {
+            if (requiredStart && normalized[0] !== normalizeWord(requiredStart)[0]) {
                 return `Must start with '${requiredStart.toUpperCase()}'`;
             }
             if (!dictionary.has(normalized)) return "Not in the allowed word list.";
             if (seenWords.has(normalized)) return "That word already appeared this match.";
             return null;
         },
-        [dictionary, myTurn, minLen, requiredStart, reversedPrevious, reverseMatchLength, seenWords, turn?.freeStart]
+        [dictionary, myTurn, minLen, requiredStart, seenWords]
     );
 
     const canSubmit = !ended && validateWord(input) === null;
@@ -235,7 +207,6 @@ export default function LiveGame({
 
     const activeTyped = typedBySeat[turn.seat] ?? (myTurn ? input : "");
     const totalLettersNeeded = minLen;
-    const timerEffects = effectEvents.filter((e) => e.type === EffectType.ADD_TIME);
     const turnContext = turn
         ? {
             round: roundIndex,
@@ -244,7 +215,6 @@ export default function LiveGame({
             playerName: currentPlayer?.name ?? null,
             requiredLength: totalLettersNeeded,
             startLetter: requiredStart,
-            freeStart: turn.freeStart,
             wins: currentPlayer?.roundWins ?? 0,
         }
         : null;
@@ -310,7 +280,7 @@ export default function LiveGame({
                     </div>
                 </div>
                 <div className="d-flex flex-row justify-content-between">
-                    <TurnTimer startedAt={turn.startedAt} dueAt={turn.dueAt} effects={timerEffects} />
+                    <TurnTimer startedAt={turn.startedAt} dueAt={turn.dueAt} />
                     <RequiredLengthGauge value={(activeTyped || "").length} min={minLen} />
                 </div>
                 <div className="d-flex flex-column gap-4 mt-4">
@@ -320,7 +290,6 @@ export default function LiveGame({
                         typedWord={activeTyped || ""}
                         previousWord={previousWord || ""}
                         startLetter={requiredStart}
-                        freeStart={turn.freeStart}
                         reverseMatchLength={reverseMatchLength}
                         invalid={shake}
                         requiredWords={totalLettersNeeded}

@@ -2,6 +2,6 @@
 {
     public enum GameStatus {WAITING, ACTIVE, FINISHED}
     public enum TurnEndReason {END, TIMEOUT}
-    public enum EffectType { ADD_TIME, FREE_START, ADJ_MIN_LEN, REQ_2_VOWELS}
+    public enum EffectType { ADD_TIME, ADJ_MIN_LEN }
     public enum  EffectTarget { SELF, NEXT }
 }
