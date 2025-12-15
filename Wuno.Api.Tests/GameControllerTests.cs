@@ -1,5 +1,4 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using wuno.domain.Rules;
 using Wuno.Api.Controllers;
 using Wuno.Application.Games.Inheritance;
 using Wuno.Application.Games.Util;
@@ -70,7 +69,7 @@ public sealed class GamesControllerTests
         public Task<NewGameResponse> StartNewGameAsync(NewGameRequest req, CancellationToken ct)
             => Task.FromResult(NewGameResponse ?? new NewGameResponse("", req.PlayerCount, req.TargetWins));
         public Task<TurnState> StartMatchAsync(Guid gameId, CancellationToken ct)
-            => Task.FromResult(new TurnState(Guid.NewGuid(), 0, 0, DateTime.UtcNow, DateTime.UtcNow, 1, false, new List<EffectState>()));
+            => Task.FromResult(new TurnState(Guid.NewGuid(), 0, 0, DateTime.UtcNow, DateTime.UtcNow, 1, 0));
         public Task<ProcessTurnOutcome> ProcessTurnAsync(Guid gameId, Guid roundId, Guid turnId, Guid playerId, int seat, string word, CancellationToken ct)
             => Task.FromResult(new ProcessTurnOutcome(false, "bad", null, null));
         public Task<List<TurnHistoryState>> GetRecentWordHistoryAsync(Guid gameId, CancellationToken ct)

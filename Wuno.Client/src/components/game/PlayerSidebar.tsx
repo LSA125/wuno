@@ -12,7 +12,6 @@ export type PlayerSidebarProps = {
         playerName?: string | null;
         requiredLength: number;
         startLetter?: string | null;
-        freeStart: boolean;
         wins: number;
     };
 };

@@ -42,7 +42,6 @@ namespace wuno.domain
         public List<Player> Players { get; } = new();
         public List<Round> Rounds { get; } = new();
         public List<Turn> Turns { get; } = new();
-        public List<Effect> Effects { get; } = new();
         public Turn? CurrentTurn { get; set; }
         public Round? CurrentRound { get; set; }
         public string? LastWord { get; set; }
@@ -87,31 +86,12 @@ namespace wuno.domain
 
         public int Index { get; set; }
         public int Seat { get; set; }
-        public int MinLen { get; set; } = 1;
-        public bool FreeStart { get; set; }
+        public int MinLen { get; set; } = 0;
         public DateTime StartedAt { get; set; }
         public DateTime DueAt { get; set; }
         public string? Word { get; set; }
         public DateTime? EndedAt { get; set; }
         public TurnEndReason? EndReason { get; set; }
-    }
-    public sealed class Effect
-    {
-        public Guid Id { get; init; } = Guid.NewGuid();
-
-        public Guid GameId { get; set; }
-        public Game Game { get; set; } = null!;
-
-        public Guid RoundId { get; set; }
-        public Round Round { get; set; } = null!;
-        public int TargetSeat { get; set; }
-        public int AppliesOnTurn { get; set; }
-        public EffectType Type { get; set; }
-        public int Value { get; set; }
-
-        // audit/idempotency:
-        public Guid? SourceTurnId { get; set; }
-        public Guid? ConsumedTurnId { get; set; }
-        public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
+        public int Score { get; set; } = 0;
     }
 }

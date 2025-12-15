@@ -4,7 +4,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using wuno.domain;
-using wuno.domain.Rules;
 
 namespace Wuno.Application.Games.Util
 {
@@ -20,9 +19,9 @@ namespace Wuno.Application.Games.Util
     public record JoinGameResponse(Guid PlayerId, GameState State);
     public record LeaveGameRequest(Guid GameId, Guid PlayerId);
     public record PlayerState(Guid PlayerId, int Seat, bool IsActive, bool IsConnected, string Name, string? IconUrl, int RoundWins, string? LastWord);
-    public record TurnState(Guid TurnId,int Index, int Seat, DateTime StartedAt, DateTime DueAt, int MinLen, bool FreeStart, List<EffectState> Effects);
+    public record TurnState(Guid TurnId, int Index, int Seat, DateTime StartedAt, DateTime DueAt, int MinLen, int Score);
     public record RoundState(Guid RoundId, int Index, Guid? WinnerId, DateTime? StartedAt, DateTime? EndedAt);
-    public record TurnHistoryState(Guid TurnId, int Index, int Seat, string Word, int MinLen, bool FreeStart, List<EffectState> Effects);
+    public record TurnHistoryState(Guid TurnId, int Index, int Seat, string Word, int MinLen, int Score);
     public record GameState(Guid GameId, GameStatus Status, int NextSeat, int Direction, int TargetWins, string? LastWord, List<PlayerState> Players, RoundState? CurrentRound, TurnState? CurrentTurn);
     public record ProcessTurnOutcome(bool Ok, string? Reason, GameState? State, TurnHistoryState? CompletedTurn);
 }

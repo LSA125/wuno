@@ -15,7 +15,6 @@ namespace Wuno.Testing.Builders
         private readonly List<PlayerBuilder> _players = new();
         private readonly List<Round> _rounds = new();
         private readonly List<TurnBuilder> _turns = new();
-        private readonly List<Effect> _effects = new();
 
         public GameBuilder WithId(Guid id) { _id = id; return this; }
         public GameBuilder WithCode(string code) { _code = code; return this; }
@@ -29,7 +28,6 @@ namespace Wuno.Testing.Builders
         public GameBuilder AddRound(Round round) { _rounds.Add(round); return this; }
         public GameBuilder AddRound(RoundBuilder round) { _rounds.Add(round.Build()); return this; }
         public GameBuilder AddTurn(TurnBuilder turn) { _turns.Add(turn); return this; }
-        public GameBuilder AddEffect(Effect effect) { _effects.Add(effect); return this; }
 
         public Game Build()
         {
@@ -64,14 +62,8 @@ namespace Wuno.Testing.Builders
                 game.Turns.Add(turn);
             }
 
-            foreach (var effect in _effects)
-            {
-                effect.GameId = game.Id;
-                effect.Game = game;
-                game.Effects.Add(effect);
-            }
-
             return game;
         }
     }
 }
+

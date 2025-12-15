@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
-using wuno.domain.Rules;
 using Wuno.Api.Hubs;
 using Wuno.Application.Games.Inheritance;
 using Wuno.Application.Games.Util;
@@ -23,7 +22,7 @@ namespace Wuno.Api.Tests
             var service = FakeGameService.ForTurn(new ProcessTurnOutcome(true, null, new GameState(Guid.NewGuid(), wuno.domain.GameStatus.ACTIVE, 0, 1, 2, null,
                 [new PlayerState(Guid.NewGuid(), 0, true, true, "p1", null, 0, null)],
                 new RoundState(Guid.NewGuid(), 0, null, DateTime.UtcNow, null),
-                new TurnState(nextTurn, 1, 0, DateTime.UtcNow, DateTime.UtcNow.AddSeconds(5), 1, false, [])), null));
+                new TurnState(nextTurn, 1, 0, DateTime.UtcNow, DateTime.UtcNow.AddSeconds(5), 1, 0)), null));
             var hub = CreateHub(service, tracker, turnTimer, hubContext, clients, userId: Guid.NewGuid());
             tracker.Add(hub.Context.ConnectionId, new PlayerSession(service.LastGameId, Guid.NewGuid(), 0, service.TestUser));
             turnTimer.Schedule(service.LastGameId, initialTurn, DateTime.UtcNow.AddSeconds(1), _ => Task.CompletedTask);
@@ -108,7 +107,7 @@ namespace Wuno.Api.Tests
             public static FakeGameService ForTurn(ProcessTurnOutcome outcome)
             {
                 var state = outcome.State ?? new GameState(Guid.NewGuid(), wuno.domain.GameStatus.ACTIVE, 0, 1, 2, null, new List<PlayerState>(), new RoundState(Guid.NewGuid(), 0, null, DateTime.UtcNow, null),
-                    new TurnState(Guid.NewGuid(), 0, 0, DateTime.UtcNow, DateTime.UtcNow, 1, false, new List<EffectState>()));
+                    new TurnState(Guid.NewGuid(), 0, 0, DateTime.UtcNow, DateTime.UtcNow, 1, 0));
                 var join = new JoinGameResponse(Guid.NewGuid(), state);
                 return new FakeGameService(join, outcome);
             }

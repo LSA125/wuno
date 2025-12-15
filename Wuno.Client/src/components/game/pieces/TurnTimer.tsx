@@ -1,14 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import EffectChip from "./EffectChip";
-import { EffectEvent } from "./effectTypes";
 export default function TurnTimer({
     startedAt,
     dueAt,
-    effects,
 }: {
     startedAt: string;
     dueAt: string;
-    effects: EffectEvent[];
 }) {
     const startedAtDate = useMemo(() => new Date(startedAt), [startedAt]);
     const dueAtDate = useMemo(() => new Date(dueAt), [dueAt]);
@@ -35,11 +31,7 @@ export default function TurnTimer({
             role="status"
             style={{ overflow: "visible" }}
         >
-            <div className="timer-effect-stack" aria-hidden={effects.length === 0}>
-                {effects.map((effect) => (
-                    <EffectChip key={effect.id} effect={effect} floating />
-                ))}
-            </div>
+
             <div className="d-flex align-items-center gap-3">
                 <div className="flex-1">
                     Time left: <strong>{s}s</strong>

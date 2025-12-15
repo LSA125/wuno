@@ -19,7 +19,7 @@ public sealed class TurnTimerTests
         serviceCollection.AddSingleton<IGameService>(new StubGameService((g, t) =>
         {
             calls.Add((g, t));
-            return Task.FromResult<GameState?>(new GameState(g, GameStatus.ACTIVE, 1, 1, 1, null, new(), new(Guid.NewGuid(), 0, null, DateTime.UtcNow, null), new(Guid.NewGuid(), 0, 1, DateTime.UtcNow, DateTime.UtcNow.AddSeconds(10), 1, true, new())));
+            return Task.FromResult<GameState?>(new GameState(g, GameStatus.ACTIVE, 1, 1, 1, null, new(), new(Guid.NewGuid(), 0, null, DateTime.UtcNow, null), new(Guid.NewGuid(), 0, 1, DateTime.UtcNow, DateTime.UtcNow.AddSeconds(10), 1, 0)));
         }));
         var provider = serviceCollection.BuildServiceProvider();
 
@@ -100,7 +100,7 @@ public sealed class TurnTimerTests
 
         public Task<NewGameResponse> StartNewGameAsync(NewGameRequest req, CancellationToken ct) => Task.FromResult(new NewGameResponse("", 0, 0));
 
-        public Task<JoinGameResponse> JoinGameAsync(Guid gameId, Guid userId, CancellationToken ct) => Task.FromResult(new JoinGameResponse(Guid.Empty, new(Guid.Empty, GameStatus.WAITING, 0, 1, 1, "", new(), new(Guid.Empty, 0, null, DateTime.UtcNow, null), new(Guid.Empty, 0, 0, DateTime.UtcNow, DateTime.UtcNow, 1, true, new()))));
+        public Task<JoinGameResponse> JoinGameAsync(Guid gameId, Guid userId, CancellationToken ct) => Task.FromResult(new JoinGameResponse(Guid.Empty, new(Guid.Empty, GameStatus.WAITING, 0, 1, 1, "", new(), new(Guid.Empty, 0, null, DateTime.UtcNow, null), new(Guid.Empty, 0, 0, DateTime.UtcNow, DateTime.UtcNow, 1, 0))));
 
         public Task<(Guid gameId, List<PlayerState> players)> DisconnectProtocolAsync(Guid playerId, CancellationToken ct) => Task.FromResult((Guid.Empty, new List<PlayerState>()));
 
@@ -108,12 +108,12 @@ public sealed class TurnTimerTests
 
         public Task<bool> MarkMatchAsStartedAsync(Guid gameId, CancellationToken ct) => Task.FromResult(false);
 
-        public Task<TurnState> StartMatchAsync(Guid gameId, CancellationToken ct) => Task.FromResult(new TurnState(Guid.Empty, 0, 0, DateTime.UtcNow, DateTime.UtcNow, 0, false, new()));
+        public Task<TurnState> StartMatchAsync(Guid gameId, CancellationToken ct) => Task.FromResult(new TurnState(Guid.Empty, 0, 0, DateTime.UtcNow, DateTime.UtcNow, 0, 0));
 
         public Task<ProcessTurnOutcome> ProcessTurnAsync(Guid gameId, Guid roundId, Guid turnId, Guid playerId, int seat, string word, CancellationToken ct) => Task.FromResult(new ProcessTurnOutcome(false, null, null, null));
         public Task<List<PlayerState>> GetPlayersAsync(Guid gameId, CancellationToken ct) => Task.FromResult(new List<PlayerState>());
 
-        public Task<GameState> GetGameStateAsync(Guid gameId, CancellationToken ct) => Task.FromResult(new GameState(Guid.Empty, GameStatus.WAITING, 0, 1, 1, null, new(), new(Guid.Empty, 0, null, null, null), new(Guid.Empty, 0, 0, DateTime.UtcNow, DateTime.UtcNow, 0, false, new())));
+        public Task<GameState> GetGameStateAsync(Guid gameId, CancellationToken ct) => Task.FromResult(new GameState(Guid.Empty, GameStatus.WAITING, 0, 1, 1, null, new(), new(Guid.Empty, 0, null, null, null), new(Guid.Empty, 0, 0, DateTime.UtcNow, DateTime.UtcNow, 0, 0)));
         public Task<int> GetCurrentSeatAsync(Guid gameId, CancellationToken ct) => Task.FromResult(0);
         public Task<List<TurnHistoryState>> GetRecentWordHistoryAsync(Guid gameId, CancellationToken ct) => Task.FromResult(new List<TurnHistoryState>());
         public Task<GameState?> TimeoutAndAdvanceAsync(Guid gameId, Guid turnId, CancellationToken ct) => _timeout(gameId, turnId);

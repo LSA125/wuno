@@ -4,7 +4,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using wuno.domain;
-using wuno.domain.Rules;
 
 namespace Wuno.Application.Games.Util
 {
@@ -16,7 +15,7 @@ namespace Wuno.Application.Games.Util
 
         private static DateTime? EnsureUtc(DateTime? value) => value is null ? null : EnsureUtc(value.Value);
 
-        public static TurnState TurnToState(Turn turn, List<EffectState> effects)
+        public static TurnState TurnToState(Turn turn)
         {
             return new TurnState(
                 turn.Id,
@@ -25,8 +24,7 @@ namespace Wuno.Application.Games.Util
                 EnsureUtc(turn.StartedAt),
                 EnsureUtc(turn.DueAt),
                 turn.MinLen,
-                turn.FreeStart,
-                effects
+                turn.Score
             );
         }
         public static RoundState RoundToState(Round round)
