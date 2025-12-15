@@ -45,41 +45,6 @@ namespace wuno.infrastructure
             b.Entity<User>().HasIndex(u => u.EmailNormalized).IsUnique().HasFilter("[EmailNormalized] IS NOT NULL AND [EmailNormalized] <> ''");
             b.Entity<User>().HasIndex(u => u.NameNormalized).IsUnique().HasFilter("[NameNormalized] IS NOT NULL AND [NameNormalized] <> ''");
             b.Entity<EmailVerificationToken>().HasIndex(t => new {t.UserId, t.TokenHash}).IsUnique();
-
-            ApplyUtcDateTimeConverters(b);
-        }
-
-        private static void ApplyUtcDateTimeConverters(ModelBuilder builder)
-        {
-            static DateTime Normalize(DateTime value) => value.Kind switch
-            {
-                DateTimeKind.Utc => value,
-                DateTimeKind.Local => value.ToUniversalTime(),
-                _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
-            };
-
-            ValueConverter<DateTime, DateTime> utcConverter = new(
-                to => Normalize(to),
-                from => DateTime.SpecifyKind(from, DateTimeKind.Utc));
-
-            ValueConverter<DateTime?, DateTime?> nullableUtcConverter = new(
-                to => to is null ? null : Normalize(to.Value),
-                from => from is null ? null : DateTime.SpecifyKind(from.Value, DateTimeKind.Utc));
-
-            foreach (var entityType in builder.Model.GetEntityTypes())
-            {
-                foreach (var property in entityType.GetProperties())
-                {
-                    if (property.ClrType == typeof(DateTime))
-                    {
-                        property.SetValueConverter(utcConverter);
-                    }
-                    else if (property.ClrType == typeof(DateTime?))
-                    {
-                        property.SetValueConverter(nullableUtcConverter);
-                    }
-                }
-            }
         }
     }
 }

@@ -162,7 +162,5 @@ namespace Wuno.Api.Hubs
                 _turnTimer.Schedule(state.GameId, state.CurrentTurn.TurnId, EnsureUtc(state.CurrentTurn.DueAt), BroadcastAfterTimeout);
             }
         }
-
-        private static DateTime EnsureUtc(DateTime dt) => DateTime.SpecifyKind(dt, DateTimeKind.Utc);
     }
 }

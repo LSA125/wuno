@@ -9,7 +9,6 @@ import LiveGame from "@/components/game/LiveGame";
 import { createGameHub } from "@/hub/connection";
 import { setPendingJoin } from "@/utils/pendingJoin";
 import { useToast } from "@/context/ToastContext";
-import { Console } from "node:console";
 
 type Phase = "waiting" | "round-start" | "playing" | "ended";
 
