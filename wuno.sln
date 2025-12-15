@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.10.35013.160
+# Visual Studio Version 18
+VisualStudioVersion = 18.1.11304.174 d18.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wuno.Domain", "wuno.domain\Wuno.Domain.csproj", "{0A5C41E2-A23B-423E-AF14-75D0EAE34BE7}"
 EndProject
@@ -24,7 +24,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wuno.Api", "wuno.api\Wuno.A
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{EF144D82-799A-41EC-838C-FDF77AA08815}"
 	ProjectSection(SolutionItems) = preProject
-		todo.txt = todo.txt
+		README.md = README.md
 	EndProjectSection
 EndProject
 Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "wuno.client", "Wuno.Client\wuno.client.esproj", "{F1BF6C5D-9593-4F3A-8EAF-BA83E94818C8}"

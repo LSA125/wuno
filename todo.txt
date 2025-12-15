@@ -1,8 +1,2 @@
-Urgent:
-refactor gameservice to take in entities instead of querying db.
-check for round/game end on turn timeout.
 
-1. Continue refactoring to add effects to the client side messages.
 
-2. Add client side cache for words played the current round. 
-Add hub endpoint for hydrating the client cache.
