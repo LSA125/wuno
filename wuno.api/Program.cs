@@ -36,6 +36,7 @@ builder.Services.AddSingleton<ITurnTimer, TurnTimer>();
 builder.Services.AddSingleton<IGroupTracker, GroupTracker>();
 builder.Services.AddSingleton<IWordList, WordList>();
 builder.Services.AddSingleton<IUserIdProvider, HubUserIdProvider>();
+builder.Services.AddHostedService<Wuno.Api.Services.GuestCleanupService>();
 builder.Services.AddControllers().AddJsonOptions(o => {
     o.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
 });
