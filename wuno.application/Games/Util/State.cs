@@ -50,6 +50,7 @@ namespace Wuno.Application.Games.Util
             
             return new PlayerState(
                 player.Id,
+                player.UserId,
                 player.Seat,
                 player.IsActive,
                 player.IsConnected,

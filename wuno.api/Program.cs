@@ -27,6 +27,7 @@ builder.Services.AddScoped<IGameService, GameService>();
 builder.Services.AddScoped<IUserService, NoEmailUserService>();
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.AddScoped<IAppUserResolver, AppUserResolver>();
+builder.Services.AddScoped<IStatsService, StatsService>();
 
 builder.Services.AddSingleton<IEmailSender, EmailSender>();
 builder.Services.AddSingleton<ICodeGeneratorService, CodeGeneratorService>();
