@@ -65,7 +65,7 @@ public sealed class TurnTimerTests
     }
 
     [Fact]
-    public async Task Schedule_returns_false_when_duplicate_turn_is_added_concurrently()
+    public async Task Scheduling_same_turn_replaces_existing_timer()
     {
         var serviceCollection = new ServiceCollection();
         serviceCollection.AddSingleton<IGameService>(new StubGameService((_, _) => Task.FromResult<GameState?>(null)));
@@ -74,11 +74,22 @@ public sealed class TurnTimerTests
         var turnId = Guid.NewGuid();
         var tasks = Enumerable.Range(0, 5).Select(_ => Task.Run(() =>
             timer.Schedule(Guid.NewGuid(), turnId, DateTime.UtcNow.AddMinutes(1), _ => Task.CompletedTask)));
+        int callbacks = 0;
+        Assert.True(timer.Schedule(Guid.NewGuid(), turnId, DateTime.UtcNow.AddMinutes(1), _ =>
+        {
+            Interlocked.Increment(ref callbacks);
+            return Task.CompletedTask;
+        }));
 
-        var results = await Task.WhenAll(tasks);
+        Assert.True(timer.Schedule(Guid.NewGuid(), turnId, DateTime.UtcNow.AddMilliseconds(30), _ =>
+        {
+            Interlocked.Increment(ref callbacks);
+            return Task.CompletedTask;
+        }));
 
-        Assert.Equal(1, results.Count(r => r));
-        Assert.False(timer.Schedule(Guid.NewGuid(), turnId, DateTime.UtcNow.AddMinutes(1), _ => Task.CompletedTask));
+        await Task.Delay(200);
+
+        Assert.Equal(1, callbacks);
     }
 
     private sealed class StubGameService : IGameService
