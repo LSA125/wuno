@@ -153,6 +153,8 @@ namespace Wuno.Api.Tests
             public Task ReadyAsync(Guid gameId, int seat, bool isReady, CancellationToken ct) => Task.CompletedTask;
             public Task ForceEndGame(Guid gameId, CancellationToken ct) => Task.CompletedTask;
             public Task<GameState?> TimeoutAndAdvanceAsync(Guid gameId, Guid turnId, CancellationToken ct) => Task.FromResult<GameState?>(_join!.State);
+            public Task<MatchmakingResponse> FindOrCreatePublicGameAsync(CancellationToken ct)
+                => Task.FromResult(new MatchmakingResponse(true, "TEST", true));
         }
 
         private sealed class TestHubContext(IHubClients clients) : IHubContext<GameHub>

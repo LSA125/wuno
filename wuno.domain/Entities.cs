@@ -45,6 +45,7 @@ namespace wuno.domain
         public Turn? CurrentTurn { get; set; }
         public Round? CurrentRound { get; set; }
         public string? LastWord { get; set; }
+        public bool IsPublic { get; set; } = false;
     }
 
     public sealed class Player

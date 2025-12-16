@@ -48,5 +48,13 @@ namespace Wuno.Api.Controllers
                 return BadRequest(new GameCodeResponse(false, null, null));
             }
         }
+
+        [HttpPost("matchmake")]
+        [AllowAnonymous]
+        public async Task<IActionResult> Matchmake(CancellationToken ct)
+        {
+            var result = await _svc.FindOrCreatePublicGameAsync(ct);
+            return Ok(result);
+        }
     }
 }

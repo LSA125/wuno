@@ -70,7 +70,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 #endif
       o.Cookie.SameSite = SameSiteMode.None;
       o.SlidingExpiration = true;
-      o.ExpireTimeSpan = TimeSpan.FromDays(14);
+      o.ExpireTimeSpan = TimeSpan.FromDays(30);
 
       o.Events = new CookieAuthenticationEvents
       {

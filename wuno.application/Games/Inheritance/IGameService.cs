@@ -21,5 +21,6 @@ namespace Wuno.Application.Games.Inheritance
         Task LeaveGameAsync(Guid userId, CancellationToken ct);
         Task<GameState?> TimeoutAndAdvanceAsync(Guid gameId, Guid turnId, CancellationToken ct);
         Task ForceEndGame(Guid gameId, CancellationToken ct);
+        Task<MatchmakingResponse> FindOrCreatePublicGameAsync(CancellationToken ct);
     }
 }
