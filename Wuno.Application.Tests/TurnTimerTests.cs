@@ -130,5 +130,7 @@ public sealed class TurnTimerTests
         public Task<GameState?> TimeoutAndAdvanceAsync(Guid gameId, Guid turnId, CancellationToken ct) => _timeout(gameId, turnId);
 
         public Task ForceEndGame(Guid gameId, CancellationToken ct) => Task.CompletedTask;
+        public Task<MatchmakingResponse> FindOrCreatePublicGameAsync(CancellationToken ct)
+            => Task.FromResult(new MatchmakingResponse(true, "TEST", true));
     }
 }

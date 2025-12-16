@@ -40,6 +40,8 @@ namespace wuno.infrastructure
             b.Entity<User>().HasIndex(u => u.EmailNormalized).IsUnique().HasFilter("[EmailNormalized] IS NOT NULL AND [EmailNormalized] <> ''");
             b.Entity<User>().HasIndex(u => u.NameNormalized).IsUnique().HasFilter("[NameNormalized] IS NOT NULL AND [NameNormalized] <> ''");
             b.Entity<EmailVerificationToken>().HasIndex(t => new {t.UserId, t.TokenHash}).IsUnique();
+            //for matchmaking - find public games with open slots
+            b.Entity<Game>().HasIndex(g => new { g.IsPublic, g.Status });
         }
     }
 }

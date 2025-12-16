@@ -76,10 +76,23 @@ namespace Wuno.Api.Hubs
         }
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
-            var ps = RequireSession();
+            // Try to remove from tracker - if not found, nothing to clean up
+            if (!_tracker.Remove(Context.ConnectionId, out var ps, out _))
+            {
+                await base.OnDisconnectedAsync(exception);
+                return;
+            }
+
             var ct = Context.ConnectionAborted;
-            var res = await _svc.DisconnectProtocolAsync(ps.PlayerId, ct);
-            await Clients.Group($"game:{ps.GameId}").SendAsync("PlayersUpdated", res.players, ct);
+            try
+            {
+                var res = await _svc.DisconnectProtocolAsync(ps.PlayerId, ct);
+                await Clients.Group($"game:{ps.GameId}").SendAsync("PlayersUpdated", res.players, ct);
+            }
+            catch
+            {
+                // Best effort - don't fail the disconnect
+            }
             await base.OnDisconnectedAsync(exception);
         }
         public async Task Ready(Guid gameId, bool isReady)
