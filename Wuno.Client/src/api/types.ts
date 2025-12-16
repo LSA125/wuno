@@ -7,6 +7,7 @@ export type GameCodeResponse = { ok: boolean; inGame: boolean | null; gameCode: 
 
 export type PlayerState = {
     playerId: string;
+    userId?: string | null;
     seat: number;
     isActive: boolean;
     isConnected: boolean;
@@ -57,3 +58,24 @@ export type GameState = {
 };
 export type JoinGameResponse = { playerId: string; state: GameState };
 export type SubmitWordResponse = { ok: boolean; reason?: string };
+
+export type TopWordEntry = { word: string; score: number };
+export type UserStatsResponse = {
+    ok: boolean;
+    gamesPlayed: number;
+    gamesWon: number;
+    winRate: number;
+    roundsWon: number;
+    highestSingleRoundScore: number;
+    topWords: TopWordEntry[];
+    totalWordsPlayed: number;
+    averageWordLength: number;
+    longestWord?: string | null;
+};
+export type InGameStatsResponse = {
+    totalWins: number;
+    gamesPlayed: number;
+    winRate: number;
+    highestScore: number;
+    topWords: TopWordEntry[];
+};

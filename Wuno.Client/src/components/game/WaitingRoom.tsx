@@ -1,13 +1,17 @@
-import type { PlayerState } from "@/api/types";
+import type { PlayerState, InGameStatsResponse } from "@/api/types";
+import DefaultAvatar from "@/assets/DefaultAvatar.svg"
+import PlayerStatsCard from "./pieces/PlayerStatsCard";
 
 export default function WaitingRoom({
     players,
     mePlayerId,
     onReadyChange,
+    playerStats,
 }: {
     players: PlayerState[];
     mePlayerId: string | null;
     onReadyChange: (ready: boolean) => void;
+    playerStats?: Record<string, InGameStatsResponse>;
 }) {
     const me = players.find((p) => p.playerId === mePlayerId);
 
@@ -20,45 +24,50 @@ export default function WaitingRoom({
 
             <div className="card-body">
                 <ul className="list-group list-group-flush">
-                    {players.map((p) => (
-                        <li
-                            key={p.playerId}
-                            className="list-group-item d-flex align-items-center justify-content-between"
-                        >
-                            <div className="d-flex align-items-center gap-3">
-                                <img
-                                    src={p.iconUrl || "/avatar.svg"}
-                                    alt={p.name ? `${p.name} avatar` : "Player avatar"}
-                                    className="rounded-circle border flex-shrink-0"
-                                    style={{
-                                        width: 32,
-                                        height: 32,
-                                        objectFit: "cover",
-                                    }}
-                                    loading="lazy"
-                                    referrerPolicy="no-referrer"
-                                />
-                                <div className="d-flex flex-column">
-                                    <div className="fw-semibold small">
-                                        {p.name || `Seat ${p.seat}`}
-                                    </div>
-                                    <div className="text-muted small">
-                                        {p.isConnected ? "online" : "offline"} &middot; wins: {p.roundWins}
+                    {players.map((p) => {
+                        const stats = playerStats?.[p.playerId];
+                        return (
+                            <li
+                                key={p.playerId}
+                                className="list-group-item d-flex align-items-start justify-content-between py-3"
+                            >
+                                <div className="d-flex align-items-start gap-3">
+                                    <img
+                                        src={p.iconUrl || DefaultAvatar}
+                                        alt={p.name ? `${p.name} avatar` : "Player avatar"}
+                                        className="rounded-circle border flex-shrink-0"
+                                        style={{
+                                            width: 48,
+                                            height: 48,
+                                            objectFit: "cover",
+                                        }}
+                                        loading="lazy"
+                                        referrerPolicy="no-referrer"
+                                    />
+                                    <div className="d-flex flex-column">
+                                        <div className="fw-semibold">
+                                            {p.name || `Seat ${p.seat}`}
+                                        </div>
+                                        <div className="text-muted small mb-1">
+                                            {p.isConnected ? "online" : "offline"}
+                                        </div>
+                                        {stats && (
+                                            <PlayerStatsCard stats={stats} compact />
+                                        )}
                                     </div>
                                 </div>
-                            </div>
 
-                            <div className="d-flex align-items-center gap-2">
-                                <span
-                                    className={`badge ${p.isActive ? "text-bg-success" : "text-bg-warning"
-                                        }`}
-                                >
-                                    {p.isActive ? "Ready" : "Not ready"}
-                                </span>
-                                <span className="badge text-bg-light">Seat {p.seat}</span>
-                            </div>
-                        </li>
-                    ))}
+                                <div className="d-flex align-items-center gap-2">
+                                    <span
+                                        className={`badge ${p.isActive ? "text-bg-success" : "text-bg-warning"
+                                            }`}
+                                    >
+                                        {p.isActive ? "Ready" : "Not ready"}
+                                    </span>
+                                </div>
+                            </li>
+                        );
+                    })}
                 </ul>
 
                 {me && (
@@ -69,7 +78,7 @@ export default function WaitingRoom({
                                 } shadow-sm`}
                             onClick={() => onReadyChange(!me.isActive)}
                         >
-                            {me.isActive ? "Unready" : "I’m Ready"}
+                            {me.isActive ? "Unready" : "I'm Ready"}
                         </button>
                     </div>
                 )}
