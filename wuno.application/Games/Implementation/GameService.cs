@@ -70,6 +70,7 @@ namespace Wuno.Application.Games.Implementation
                 TargetWins = Math.Clamp(req.TargetWins, Constants.MIN_TARGET_WINS, Constants.MAX_TARGET_WINS),
                 CurSeat = 1,
                 Status = GameStatus.WAITING,
+                IsPublic = req.IsPublic,
             };
             // try generate unique code
             string code;
@@ -513,8 +514,22 @@ namespace Wuno.Application.Games.Implementation
             var user = await _db.Users
                 .Include(u => u.ActivePlayer)
                 .FirstOrDefaultAsync(u => u.Id == userId, ct) ?? throw new Exception("User not found when leaving game");
-            user.ActivePlayer!.IsConnected = false;
-            user.ActivePlayer.IsTaken = false;
+            
+            var player = user.ActivePlayer;
+            if (player != null)
+            {
+                // Reset player slot so another player can take it
+                player.IsConnected = false;
+                player.IsTaken = false;
+                player.IsActive = false;
+                player.Name = "";
+                player.IconUrl = null;
+                player.RoundWins = 0;
+                player.LastWord = null;
+                player.TurnsPlayedThisRound = 0;
+                player.RemainingTime = Constants.INITIAL_REMAINING_TIME_SEC;
+                player.UserId = null;
+            }
             user.ActivePlayer = null;
 
             await _db.SaveChangesAsync(ct);
@@ -645,6 +660,31 @@ namespace Wuno.Application.Games.Implementation
             }
             game.Status = GameStatus.FINISHED;
             await _db.SaveChangesAsync(ct);
+        }
+
+        public async Task<MatchmakingResponse> FindOrCreatePublicGameAsync(CancellationToken ct)
+        {
+            // Find a public game with open slots
+            var publicGame = await _db.Games
+                .Include(g => g.Players)
+                .Where(g => g.IsPublic && g.Status == GameStatus.WAITING)
+                .Where(g => g.Players.Any(p => !p.IsTaken))
+                .OrderBy(g => g.CreatedAt)
+                .FirstOrDefaultAsync(ct);
+
+            if (publicGame != null)
+            {
+                return new MatchmakingResponse(true, publicGame.Code, false);
+            }
+
+            // No public game found, create one with defaults
+            var newGame = await StartNewGameAsync(new NewGameRequest(
+                PlayerCount: 4,
+                TargetWins: 3,
+                IsPublic: true
+            ), ct);
+
+            return new MatchmakingResponse(true, newGame.GameCode, true);
         }
     }
 }

@@ -76,6 +76,8 @@ public sealed class GamesControllerTests
             => Task.FromResult(new List<TurnHistoryState>());
         public Task ReadyAsync(Guid gameId, int seat, bool isReady, CancellationToken ct) => Task.CompletedTask;
         public Task LeaveGameAsync(Guid userId, CancellationToken ct) => Task.CompletedTask;
+        public Task<MatchmakingResponse> FindOrCreatePublicGameAsync(CancellationToken ct)
+            => Task.FromResult(new MatchmakingResponse(true, "TEST", true));
     }
 
     private sealed class MissingUserResolver : IAppUserResolver
