@@ -1,5 +1,5 @@
 // Lightweight JSON client + typed helpers for your endpoints
-import { RegUserRequest, TmpUserRequest, UserResponse, NewGameRequest, NewGameResponse, GameCodeResponse } from "./types";
+import { RegUserRequest, TmpUserRequest, UserResponse, NewGameRequest, NewGameResponse, GameCodeResponse, UserStatsResponse, InGameStatsResponse, MatchmakingResponse } from "./types";
 
 
 export async function request<T>(
@@ -49,6 +49,11 @@ export const Api = {
     createGame: (req: NewGameRequest) => request<NewGameResponse>(`/api/games/new`, { method: "POST", body: JSON.stringify(req) }),
     getGameState: (id: string) => request(`/api/games/id/${id}`, { method: "POST" }),
     activeForCurrent: () => request<GameCodeResponse>(`/api/games/active-for-current`, { method: "GET" }),
+    matchmake: () => request<MatchmakingResponse>(`/api/games/matchmake`, { method: "POST" }),
+
+    // Stats
+    getUserStats: (userId: string) => request<UserStatsResponse>(`/api/stats/${userId}`, { method: "GET" }),
+    getInGameStats: (userId: string) => request<InGameStatsResponse>(`/api/stats/${userId}/ingame`, { method: "GET" }),
 };
 
 export const Auth = {

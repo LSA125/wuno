@@ -3,6 +3,7 @@ import App from "./App";
 import LandingPage from "./pages/LandingPage";
 import LobbyPage from "./pages/LobbyPage";
 import GamePage from "./pages/GamePage";
+import StatsPage from "./pages/StatsPage";
 
 const router = createBrowserRouter([
     {
@@ -15,9 +16,11 @@ const router = createBrowserRouter([
             // Lobby page (user enters after creating / loading profile)
             { path: "lobby", element: <LobbyPage /> },
 
+            // Stats page
+            { path: "stats", element: <StatsPage /> },
+
             // Future pages
             { path: "game/:code", element: <GamePage /> },
-            // { path: "stat/:user", element: <UserStatsPage /> },
 
             // Catch-all for unknown URLs
             { path: "*", element: <Navigate to="/" replace /> },

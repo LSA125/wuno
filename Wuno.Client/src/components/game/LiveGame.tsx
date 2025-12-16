@@ -3,11 +3,13 @@ import type { GameState, TurnHistoryState, TurnState } from "@/api/types";
 import RequiredLengthGauge from "./pieces/RequiredLengthGauge";
 import PlayerSidebar from "./PlayerSidebar";
 import RestrictionTrack from "./pieces/RestrictionTrack";
-import { EffectType, EffectEvent } from "./pieces/effectTypes";
 import RecentWordHistory from "./pieces/RecentWordHistory";
 import { computeReverseMatchLength, normalizeWord, reverseString } from "@/utils/wordMatching";
 import TurnTimer from "./pieces/TurnTimer";
 import wordListText from "@/assets/words.txt?raw";
+import { playErrorSound, playSuccessSound, playTurnStartSound, startTickingSound, stopTickingSound, playMatchSound } from "@/utils/sounds";
+import { getLetterValue } from "@/utils/letterScoring";
+import { TIME_BONUS_MULTIPLIER, SCORE_DIVISOR } from "@/constants";
 
 type LiveGameProps = {
     state: GameState;
@@ -42,11 +44,8 @@ export default function LiveGame({
     const [invalidReason, setInvalidReason] = useState<string | null>(null);
     const [shake, setShake] = useState(false);
     const [seenWords, setSeenWords] = useState<Set<string>>(new Set());
-    const [effectEvents, setEffectEvents] = useState<EffectEvent[]>([]);
     const lastMatchRef = useRef(0);
-    const lastTurnIdRef = useRef<string | null>(null);
-    const lastEffectCountRef = useRef(0);
-    const audioRef = useRef<AudioContext | null>(null);
+    const prevTurnIdRef = useRef<string | null>(null);
 
     const dictionary = useMemo(
         () => new Set(wordListText.split(/\r?\n/).map(normalizeWord).filter(Boolean)),
@@ -73,55 +72,58 @@ export default function LiveGame({
         return () => clearTimeout(id);
     }, [submitError]);
 
-    useEffect(() => {
-        if (!turn) {
-            setEffectEvents([]);
-            lastEffectCountRef.current = 0;
-            lastTurnIdRef.current = null;
-            return;
-        }
-
-        const sameTurn = lastTurnIdRef.current === turn.turnId;
-        const baseline = sameTurn ? lastEffectCountRef.current : 0;
-        const newEffects = turn.effects.slice(baseline);
-
-        newEffects.forEach((effect, idx) => {
-            const id = Number(`${Date.now()}${idx}`);
-            setEffectEvents((prev) => [...prev, { ...effect, id }]);
-            setTimeout(() => {
-                setEffectEvents((prev) => prev.filter((e) => e.id !== id));
-            }, 2000);
-        });
-
-        lastTurnIdRef.current = turn.turnId;
-        lastEffectCountRef.current = turn.effects.length;
-    }, [turn]);
-
     const currentPlayer = players.find((p) => p.seat === turn?.seat);
     const previousWord = state.lastWord ?? "";
     const reversedPrevious = reverseString(normalizeWord(previousWord));
     const normalizedInput = normalizeWord(input);
     const reverseMatchLength = computeReverseMatchLength(normalizedInput, reversedPrevious);
-    const requiredStart = !turn?.freeStart && previousWord ? previousWord.slice(-1) : null;
-
-    // Gentle tone that increases pitch as more letters match the reverse chain
-    useEffect(() => {
-        if (!turn ) return;
-        const ctx = (audioRef.current ??= new AudioContext());
-        const oscillator = ctx.createOscillator();
-        const gain = ctx.createGain();
-        oscillator.type = "sine";
-        oscillator.frequency.value = 260 + reverseMatchLength * 35;
-        gain.gain.value = 0.05;
-        oscillator.connect(gain).connect(ctx.destination);
-        oscillator.start();
-        oscillator.stop(ctx.currentTime + 0.15);
-        lastMatchRef.current = reverseMatchLength;
-    }, [reverseMatchLength, normalizedInput, turn]);
-
+    const requiredStart = previousWord ? previousWord.slice(-1) : null;
     const myTurn = turn?.seat === meSeat;
     const minLen = turn?.minLen ?? 0;
     const roundIndex = (state.currentRound?.index ?? 0) + 1;
+
+    // Calculate potential score and bonus time from current word
+    const potentialScore = useMemo(() => {
+        if (!normalizedInput || reverseMatchLength === 0) return 0;
+        let score = 0;
+        for (let i = 0; i < reverseMatchLength && i < normalizedInput.length; i++) {
+            score += getLetterValue(normalizedInput[i]) * (i + 1);
+        }
+        return score;
+    }, [normalizedInput, reverseMatchLength]);
+
+    // Bonus time = score * TIME_BONUS_MULTIPLIER (same as backend logic)
+    const bonusSeconds = potentialScore * TIME_BONUS_MULTIPLIER;
+    // Min length reduction = score / SCORE_DIVISOR
+    const potentialMinLenReduction = Math.floor(potentialScore / SCORE_DIVISOR);
+
+    // Play turn start sound and start ticking when it's my turn
+    useEffect(() => {
+        if (ended || !turn) {
+            stopTickingSound();
+            prevTurnIdRef.current = null;
+            return;
+        }
+        
+        const isNewTurn = prevTurnIdRef.current !== turn.turnId;
+        prevTurnIdRef.current = turn.turnId;
+        
+        if (myTurn && isNewTurn) {
+            playTurnStartSound();
+            startTickingSound();
+        } else if (!myTurn) {
+            stopTickingSound();
+        }
+        
+        return () => stopTickingSound();
+    }, [turn?.turnId, myTurn, ended]);
+
+    // Play match sound when reverse match length changes
+    useEffect(() => {
+        if (!turn || reverseMatchLength <= lastMatchRef.current) return;
+        playMatchSound(reverseMatchLength);
+        lastMatchRef.current = reverseMatchLength;
+    }, [reverseMatchLength, turn]);
     const validateWord = useCallback(
         (word: string): string | null => {
             const trimmed = word.trim();
@@ -130,14 +132,14 @@ export default function LiveGame({
             const normalized = normalizeWord(trimmed);
             if (!/^[a-z]+$/i.test(trimmed)) return "Letters only, no symbols.";
             if (normalized.length < minLen) return `Need at least ${minLen} letters.`;
-            if (!turn.freeStart && requiredStart && normalized[0] !== normalizeWord(requiredStart)[0]) {
+            if (requiredStart && normalized[0] !== normalizeWord(requiredStart)[0]) {
                 return `Must start with '${requiredStart.toUpperCase()}'`;
             }
             if (!dictionary.has(normalized)) return "Not in the allowed word list.";
             if (seenWords.has(normalized)) return "That word already appeared this match.";
             return null;
         },
-        [dictionary, myTurn, minLen, requiredStart, reversedPrevious, reverseMatchLength, seenWords, turn?.freeStart]
+        [dictionary, myTurn, minLen, requiredStart, seenWords]
     );
 
     const canSubmit = !ended && validateWord(input) === null;
@@ -156,11 +158,13 @@ export default function LiveGame({
         if (reason) {
             setInvalidReason(reason);
             setShake(true);
+            playErrorSound();
             setTimeout(() => setShake(false), 350);
             return;
         }
         const trimmed = input.trim();
         if (!trimmed) return;
+        playSuccessSound();
         onSubmit(trimmed);
         setInput("");
         setInvalidReason(null);
@@ -200,6 +204,19 @@ export default function LiveGame({
 
             if (/^[a-z]$/i.test(event.key)) {
                 event.preventDefault();
+                const newLetter = event.key.toLowerCase();
+                
+                // Block wrong first letter
+                if (input.length === 0 && requiredStart) {
+                    const requiredLower = normalizeWord(requiredStart).toLowerCase();
+                    if (newLetter !== requiredLower) {
+                        playErrorSound();
+                        setShake(true);
+                        setTimeout(() => setShake(false), 350);
+                        return;
+                    }
+                }
+                
                 setInput((prev) => `${prev}${event.key}`);
             }
         };
@@ -235,16 +252,13 @@ export default function LiveGame({
 
     const activeTyped = typedBySeat[turn.seat] ?? (myTurn ? input : "");
     const totalLettersNeeded = minLen;
-    const timerEffects = effectEvents.filter((e) => e.type === EffectType.ADD_TIME);
     const turnContext = turn
         ? {
             round: roundIndex,
             turn: turn.index + 1,
-            seat: turn.seat,
             playerName: currentPlayer?.name ?? null,
             requiredLength: totalLettersNeeded,
             startLetter: requiredStart,
-            freeStart: turn.freeStart,
             wins: currentPlayer?.roundWins ?? 0,
         }
         : null;
@@ -289,7 +303,7 @@ export default function LiveGame({
                         Back to lobby
                     </button>
                 </div>
-                <PlayerSidebar players={players} currentSeat={turn.seat} meSeat={meSeat} turnContext={turnContext ?? undefined} />
+                <PlayerSidebar players={players} currentSeat={turn.seat} meSeat={meSeat} turnDueAt={turn.dueAt} turnContext={turnContext ?? undefined} />
             </section>
         );
     }
@@ -309,9 +323,18 @@ export default function LiveGame({
                         </button>
                     </div>
                 </div>
-                <div className="d-flex flex-row justify-content-between">
-                    <TurnTimer startedAt={turn.startedAt} dueAt={turn.dueAt} effects={timerEffects} />
-                    <RequiredLengthGauge value={(activeTyped || "").length} min={minLen} />
+                <div className="d-flex flex-row justify-content-between gap-3">
+                    <TurnTimer 
+                        startedAt={turn.startedAt} 
+                        dueAt={turn.dueAt} 
+                        bonusSeconds={myTurn ? bonusSeconds : 0}
+                        potentialScore={myTurn ? potentialScore : 0}
+                    />
+                    <RequiredLengthGauge 
+                        value={(activeTyped || "").length} 
+                        min={minLen} 
+                        potentialMinLen={myTurn ? Math.max(0, minLen - potentialMinLenReduction) : minLen}
+                    />
                 </div>
                 <div className="d-flex flex-column gap-4 mt-4">
 
@@ -320,22 +343,24 @@ export default function LiveGame({
                         typedWord={activeTyped || ""}
                         previousWord={previousWord || ""}
                         startLetter={requiredStart}
-                        freeStart={turn.freeStart}
                         reverseMatchLength={reverseMatchLength}
                         invalid={shake}
                         requiredWords={totalLettersNeeded}
                     >
-                        <span>
-                            {invalidReason ??
-                                (myTurn
+                        {invalidReason ? (
+                            <div className="invalid-reason">{invalidReason}</div>
+                        ) : (
+                            <span className="text-muted">
+                                {myTurn
                                     ? "Type letters anywhere on the page."
-                                    : `${turnContext?.playerName ?? "Another player"} is typing`)}
-                        </span>
-                        <RecentWordHistory history={wordHistory} fallbackPrevious={previousWord || ""} />
+                                    : `${turnContext?.playerName ?? "Another player"} is typing`}
+                            </span>
+                        )}
+                        <RecentWordHistory history={wordHistory} fallbackPrevious={previousWord || ""} players={players} />
                     </RestrictionTrack>
                 </div>
             </div>
-            <PlayerSidebar players={players} currentSeat={turn.seat} meSeat={meSeat} turnContext={turnContext ?? undefined} />
+            <PlayerSidebar players={players} currentSeat={turn.seat} meSeat={meSeat} turnDueAt={turn.dueAt} turnContext={turnContext ?? undefined} />
         </section>
     );
 }

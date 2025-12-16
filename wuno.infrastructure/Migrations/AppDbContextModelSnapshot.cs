@@ -22,48 +22,6 @@ namespace Wuno.Infrastructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("wuno.domain.Effect", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("AppliesOnTurn")
-                        .HasColumnType("int");
-
-                    b.Property<Guid?>("ConsumedTurnId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid>("GameId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("RoundId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid?>("SourceTurnId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("TargetSeat")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Type")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Value")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("GameId");
-
-                    b.HasIndex("RoundId", "TargetSeat", "AppliesOnTurn");
-
-                    b.ToTable("Effects");
-                });
-
             modelBuilder.Entity("wuno.domain.EmailVerificationToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -116,6 +74,9 @@ namespace Wuno.Infrastructure.Migrations
                     b.Property<int>("Direction")
                         .HasColumnType("int");
 
+                    b.Property<bool>("IsPublic")
+                        .HasColumnType("bit");
+
                     b.Property<string>("LastWord")
                         .HasColumnType("nvarchar(max)");
 
@@ -134,6 +95,8 @@ namespace Wuno.Infrastructure.Migrations
                     b.HasIndex("CurrentRoundId");
 
                     b.HasIndex("CurrentTurnId");
+
+                    b.HasIndex("IsPublic", "Status");
 
                     b.ToTable("Games");
                 });
@@ -165,6 +128,9 @@ namespace Wuno.Infrastructure.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<double>("RemainingTime")
+                        .HasColumnType("float");
 
                     b.Property<int>("RoundWins")
                         .HasColumnType("int");
@@ -233,9 +199,6 @@ namespace Wuno.Infrastructure.Migrations
                     b.Property<DateTime?>("EndedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<bool>("FreeStart")
-                        .HasColumnType("bit");
-
                     b.Property<Guid>("GameId")
                         .HasColumnType("uniqueidentifier");
 
@@ -247,6 +210,9 @@ namespace Wuno.Infrastructure.Migrations
 
                     b.Property<Guid>("RoundId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Score")
+                        .HasColumnType("int");
 
                     b.Property<int>("Seat")
                         .HasColumnType("int");
@@ -318,25 +284,6 @@ namespace Wuno.Infrastructure.Migrations
                         .HasFilter("[NameNormalized] IS NOT NULL AND [NameNormalized] <> ''");
 
                     b.ToTable("Users");
-                });
-
-            modelBuilder.Entity("wuno.domain.Effect", b =>
-                {
-                    b.HasOne("wuno.domain.Game", "Game")
-                        .WithMany("Effects")
-                        .HasForeignKey("GameId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("wuno.domain.Round", "Round")
-                        .WithMany()
-                        .HasForeignKey("RoundId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Game");
-
-                    b.Navigation("Round");
                 });
 
             modelBuilder.Entity("wuno.domain.EmailVerificationToken", b =>
@@ -417,8 +364,6 @@ namespace Wuno.Infrastructure.Migrations
 
             modelBuilder.Entity("wuno.domain.Game", b =>
                 {
-                    b.Navigation("Effects");
-
                     b.Navigation("Players");
 
                     b.Navigation("Rounds");

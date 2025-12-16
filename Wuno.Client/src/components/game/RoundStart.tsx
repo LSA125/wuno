@@ -1,13 +1,16 @@
-import type { PlayerState } from "@/api/types";
+import type { PlayerState, InGameStatsResponse } from "@/api/types";
+import PlayerStatsCard from "./pieces/PlayerStatsCard";
 
 export default function RoundStart({
     players,
     targetWins,
     msRemaining,
+    playerStats,
 }: {
     players: PlayerState[];
     targetWins: number;
     msRemaining: number;
+    playerStats?: Record<string, InGameStatsResponse>;
 }) {
     const top = [...players].sort((a, b) => b.roundWins - a.roundWins).slice(0, 3);
     const totalWindow = 3000;
@@ -24,14 +27,34 @@ export default function RoundStart({
                         {Array.from({ length: 3 }).map((_, i) => {
                             const p = top[i];
                             const podiumH = [24, 32, 20][i]; // mid tallest
+                            const stats = p ? playerStats?.[p.playerId] : undefined;
                             return (
                                 <div key={i} className="flex flex-col items-center">
                                     <div className="text-sm mb-2">{p?.name ?? "—"}</div>
-                                    <div className="w-full bg-base-200 border rounded-t-xl flex items-end justify-center"
+                                    <div className="w-full bg-base-200 border rounded-t-xl flex flex-col items-center justify-end"
                                         style={{ height: `${podiumH}vh` }}>
-                                        <div className="mb-2 text-2xl font-bold">{p ? p.roundWins : ""}</div>
+                                        <div className="mb-1 text-2xl font-bold">{p ? p.roundWins : ""}</div>
+                                        {stats && (
+                                            <div className="mb-2 text-xs">
+                                                <span className="badge bg-success me-1" title="Career Wins">
+                                                    🏆 {stats.totalWins}
+                                                </span>
+                                                <span className="badge bg-secondary" title="Win Rate">
+                                                    {stats.winRate}%
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="text-xs mt-1 opacity-70">{p ? `Seat ${p.seat}` : ""}</div>
+                                    {stats && stats.topWords.length > 0 && (
+                                        <div className="mt-1 d-flex flex-wrap gap-1 justify-center">
+                                            {stats.topWords.slice(0, 2).map((w, wi) => (
+                                                <span key={w.word} className={`badge ${wi === 0 ? 'bg-warning text-dark' : 'bg-secondary'}`} style={{ fontSize: '0.65rem' }}>
+                                                    {w.word.toUpperCase()}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}

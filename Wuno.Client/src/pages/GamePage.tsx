@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
-import type { GameState, JoinGameResponse, PlayerState, TurnHistoryState } from "@/api/types";
+import type { GameState, JoinGameResponse, PlayerState, TurnHistoryState, InGameStatsResponse } from "@/api/types";
 import { getCookie } from "@/auth/cookies";
 import WaitingRoom from "@/components/game/WaitingRoom";
 import RoundStart from "@/components/game/RoundStart";
@@ -9,7 +9,7 @@ import LiveGame from "@/components/game/LiveGame";
 import { createGameHub } from "@/hub/connection";
 import { setPendingJoin } from "@/utils/pendingJoin";
 import { useToast } from "@/context/ToastContext";
-import { Console } from "node:console";
+import { Api } from "@/api/client";
 
 type Phase = "waiting" | "round-start" | "playing" | "ended";
 
@@ -27,6 +27,7 @@ export default function GamePage() {
     const [typedBySeat, setTypedBySeat] = useState<Record<number, string>>({});
     const [submitError, setSubmitError] = useState<{ id: number; reason: string } | null>(null);
     const [wordHistory, setWordHistory] = useState<TurnHistoryState[]>([]);
+    const [playerStats, setPlayerStats] = useState<Record<string, InGameStatsResponse>>({});
     const { push } = useToast();
 
     const lastRoundRef = useRef<string | null>(null);
@@ -112,6 +113,33 @@ export default function GamePage() {
         window.addEventListener("beforeunload", beforeUnload);
         return () => window.removeEventListener("beforeunload", beforeUnload);
     }, [state?.gameId]);
+
+    // Fetch stats for all players when players list updates
+    useEffect(() => {
+        if (!state?.players || state.players.length === 0) return;
+        
+        const fetchAllStats = async () => {
+            const statsPromises = state.players
+                .filter(p => p.userId) // Only fetch for players with userId
+                .map(async (p) => {
+                    try {
+                        const stats = await Api.getInGameStats(p.userId!);
+                        return { playerId: p.playerId, stats };
+                    } catch {
+                        return null;
+                    }
+                });
+            
+            const results = await Promise.all(statsPromises);
+            const newStatsMap: Record<string, InGameStatsResponse> = {};
+            results.forEach(r => {
+                if (r) newStatsMap[r.playerId] = r.stats;
+            });
+            setPlayerStats(newStatsMap);
+        };
+        
+        fetchAllStats();
+    }, [state?.players]);
 
     // Connect + join on mount
     useEffect(() => {
@@ -339,6 +367,7 @@ export default function GamePage() {
                     players={state.players}
                     mePlayerId={mePlayerId}
                     onReadyChange={setReady}
+                    playerStats={playerStats}
                 />
             )}
 
@@ -347,6 +376,7 @@ export default function GamePage() {
                     players={state.players}
                     targetWins={state.targetWins}
                     msRemaining={roundCountdownMs ?? 0}
+                    playerStats={playerStats}
                 />
             )}
 

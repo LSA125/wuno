@@ -1,45 +1,72 @@
-import type { TurnHistoryState } from "@/api/types";
-import EffectChip from "./EffectChip";
+import { useEffect, useRef } from "react";
+import type { TurnHistoryState, PlayerState } from "@/api/types";
 import WordPreview from "./WordPreview";
 
 export type RecentWordHistoryProps = {
     history: TurnHistoryState[] | null | undefined;
     fallbackPrevious?: string | null;
+    players?: PlayerState[];
 };
 
-export default function RecentWordHistory({ history, fallbackPrevious }: RecentWordHistoryProps) {
+export default function RecentWordHistory({ history, fallbackPrevious, players = [] }: RecentWordHistoryProps) {
+    const scrollRef = useRef<HTMLDivElement>(null);
     const entries = history ?? [];
-    const listCount = Math.min(entries.length, 4);
-    const recent = entries.slice(-listCount);
-    const offset = entries.length - recent.length;
+
+    // Reverse to show most recent at top
+    const reversed = [...entries].reverse();
+
+    // Auto-scroll to top when new word is added
+    useEffect(() => {
+        if (scrollRef.current) {
+            scrollRef.current.scrollTop = 0;
+        }
+    }, [entries.length]);
+
+    // Helper to get player name by seat
+    const getPlayerName = (seat: number) => {
+        const player = players.find(p => p.seat === seat);
+        return player?.name || "Player";
+    };
+
+    if (reversed.length === 0) {
+        return (
+            <div className="text-muted small text-center py-3">
+                No words played yet
+            </div>
+        );
+    }
 
     return (
-        <div className="recent-word-inline" aria-label="Recent word history">
-            <div className="letter-track recent-word-track" role="list">
-                {recent.map((entry, idx) => {
-                    const globalIdx = offset + idx;
-                    const prevWord = globalIdx > 0 ? entries[globalIdx - 1]?.word : fallbackPrevious || "";
+        <div className="word-history-scroll" ref={scrollRef} aria-label="Recent word history">
+            <div className="word-history-list">
+                {reversed.map((entry, idx) => {
+                    // Find the previous word for this entry
+                    const originalIdx = entries.length - 1 - idx;
+                    const prevWord = originalIdx > 0 ? entries[originalIdx - 1]?.word : fallbackPrevious || "";
+                    const isLatest = idx === 0;
+
                     return (
-                        <div key={entry.turnId} className="letter-box history-box" role="listitem">
-                            <div className="d-flex justify-content-between align-items-center w-100 gap-2 text-muted small">
-                                <span className="text-uppercase fw-semibold">Seat {entry.seat}</span>
-                                <span className="text-xs">Turn #{entry.index + 1}</span>
+                        <div
+                            key={entry.turnId}
+                            className={`word-history-item ${isLatest ? "latest" : ""}`}
+                        >
+                            <div className="d-flex justify-content-between align-items-center mb-2">
+                                <span className="fw-semibold small">{getPlayerName(entry.seat)}</span>
+                                <div className="d-flex align-items-center gap-2">
+                                    {entry.score > 0 && (
+                                        <span className="badge bg-success">+{entry.score} pts</span>
+                                    )}
+                                    <span className="text-muted text-xs">Turn {entry.index + 1}</span>
+                                </div>
                             </div>
                             <WordPreview
                                 word={entry.word}
                                 previousWord={prevWord}
                                 minLen={entry.minLen}
                                 compact
-                                label={`Word from seat ${entry.seat}`}
-                                effects={[]}
+                                label={`Word by ${getPlayerName(entry.seat)}`}
+                                score={entry.score}
                             />
-                            {entry.effects.length > 0 && (
-                                <div className="recent-effect-list" aria-label="Applied effects">
-                                    {entry.effects.map((effect, i) => (
-                                        <EffectChip key={`${entry.turnId}-${i}`} effect={effect} subtle compact />
-                                    ))}
-                                </div>
-                            )}
                         </div>
                     );
                 })}
@@ -47,3 +74,4 @@ export default function RecentWordHistory({ history, fallbackPrevious }: RecentW
         </div>
     );
 }
+

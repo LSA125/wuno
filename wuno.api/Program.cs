@@ -27,6 +27,7 @@ builder.Services.AddScoped<IGameService, GameService>();
 builder.Services.AddScoped<IUserService, NoEmailUserService>();
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.AddScoped<IAppUserResolver, AppUserResolver>();
+builder.Services.AddScoped<IStatsService, StatsService>();
 
 builder.Services.AddSingleton<IEmailSender, EmailSender>();
 builder.Services.AddSingleton<ICodeGeneratorService, CodeGeneratorService>();
@@ -35,6 +36,7 @@ builder.Services.AddSingleton<ITurnTimer, TurnTimer>();
 builder.Services.AddSingleton<IGroupTracker, GroupTracker>();
 builder.Services.AddSingleton<IWordList, WordList>();
 builder.Services.AddSingleton<IUserIdProvider, HubUserIdProvider>();
+builder.Services.AddHostedService<Wuno.Api.Services.GuestCleanupService>();
 builder.Services.AddControllers().AddJsonOptions(o => {
     o.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
 });
@@ -69,7 +71,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 #endif
       o.Cookie.SameSite = SameSiteMode.None;
       o.SlidingExpiration = true;
-      o.ExpireTimeSpan = TimeSpan.FromDays(14);
+      o.ExpireTimeSpan = TimeSpan.FromDays(30);
 
       o.Events = new CookieAuthenticationEvents
       {

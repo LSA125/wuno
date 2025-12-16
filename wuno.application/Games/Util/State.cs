@@ -10,7 +10,13 @@ namespace Wuno.Application.Games.Util
 {
     public static class State
     {
-        public static TurnState TurnToState(Turn turn, List<EffectState> effects)
+        private static DateTime EnsureUtc(DateTime value) => value.Kind == DateTimeKind.Utc
+            ? value
+            : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+
+        private static DateTime? EnsureUtc(DateTime? value) => value is null ? null : EnsureUtc(value.Value);
+
+        public static TurnState TurnToState(Turn turn)
         {
             var startedAt = DateTime.SpecifyKind(turn.StartedAt, DateTimeKind.Utc);
             var dueAt = DateTime.SpecifyKind(turn.DueAt, DateTimeKind.Utc);
@@ -21,8 +27,7 @@ namespace Wuno.Application.Games.Util
                 startedAt,
                 dueAt,
                 turn.MinLen,
-                turn.FreeStart,
-                effects
+                turn.Score
             );
         }
         public static RoundState RoundToState(Round round)
@@ -39,15 +44,21 @@ namespace Wuno.Application.Games.Util
         }
         public static PlayerState PlayerToState(Player player)
         {
+            // Cap remaining time by the max time for this player's upcoming turn
+            int maxTime = EffectsLogic.CalculateMaxTime(player.TurnsPlayedThisRound, isFirstTurn: false);
+            double cappedRemainingTime = Math.Min(player.RemainingTime, maxTime);
+            
             return new PlayerState(
                 player.Id,
+                player.UserId,
                 player.Seat,
                 player.IsActive,
                 player.IsConnected,
                 player.Name,
                 player.IconUrl,
                 player.RoundWins,
-                player.LastWord
+                player.LastWord,
+                cappedRemainingTime
             );
         }
         public static GameState GameToState(Game game,

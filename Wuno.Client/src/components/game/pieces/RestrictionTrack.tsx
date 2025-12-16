@@ -1,10 +1,11 @@
 import { type ReactNode, useMemo } from "react";
+import { getLetterValue } from "@/utils/letterScoring";
+
 export type RestrictionTrackProps = {
     minLen: number;
     typedWord: string;
     previousWord?: string | null;
     startLetter: string | null;
-    freeStart: boolean;
     reverseMatchLength: number;
     invalid?: boolean;
     requiredWords: number;
@@ -23,7 +24,6 @@ export default function RestrictionTrack({
     typedWord,
     previousWord,
     startLetter,
-    freeStart,
     reverseMatchLength,
     invalid = false,
     requiredWords,
@@ -34,7 +34,7 @@ export default function RestrictionTrack({
     const reversedPrev = useMemo(() => prev.split("").reverse(), [prev]);
     const totalBoxes = Math.max(minLen, typed.length, reversedPrev.length || 0, 4);
 
-    const ready = typed.length >= minLen && (freeStart || (startLetter ? typed.startsWith(normalizeWord(startLetter)) : true));
+    const ready = typed.length >= minLen && (startLetter ? typed.startsWith(normalizeWord(startLetter)) : true);
 
     return (
         <div className={`restriction-track card border-0 shadow-sm ${invalid ? "shake" : ""}`}>
@@ -52,7 +52,7 @@ export default function RestrictionTrack({
                     {Array.from({ length: totalBoxes }).map((_, idx) => {
                         const typedChar = typed[idx];
                         const prevChar = reversedPrev[idx];
-                        const requirementLetter = !freeStart && idx === 0 && startLetter ? startLetter.toUpperCase() : "";
+                        const requirementLetter = startLetter && idx === 0 ? startLetter.toUpperCase() : "";
                         const matchesReverse = idx < reverseMatchLength && Boolean(prevChar);
                         const pending = !typedChar && idx < minLen;
                         const unmetRequirement = requirementLetter && typedChar && typedChar !== requirementLetter;
@@ -64,10 +64,23 @@ export default function RestrictionTrack({
                         else if (pending) stateClass += " pending";
                         else if (active) stateClass += " ghost";
 
+                        // Calculate points for this position
+                        const displayChar = typedChar || prevChar || "";
+                        const multiplier = idx + 1;
+                        const pointValue = displayChar ? getLetterValue(displayChar) : 0;
+
                         return (
                             <div key={idx} className={stateClass} data-letter-index={idx} aria-label={`Letter slot ${idx + 1}`}>
+                                {/* Multiplier badge above */}
+                                <span className="letter-multiplier">×{multiplier}</span>
+
+                                {/* Main letter */}
                                 <span className="letter-main">{typedChar || requirementLetter || prevChar || "·"}</span>
-                                {prevChar && <span className="letter-hint">{prevChar}</span>}
+
+                                {/* Point value below */}
+                                {displayChar && (
+                                    <span className="letter-points">{pointValue}pt</span>
+                                )}
                             </div>
                         );
                     })}
@@ -75,7 +88,7 @@ export default function RestrictionTrack({
 
                 {children && <div className="mt-3">{children}</div>}
                 <div className="d-flex flex-wrap gap-3 mt-3 text-muted small">
-                    <span>{freeStart ? "Free start — ignore the first letter" : `Must start with ${startLetter?.toUpperCase() || "?"}`}</span>
+                    <span>{startLetter ? `Must start with ${startLetter.toUpperCase()}` : "Any start letter allowed"}</span>
                     <span className="dot" aria-hidden="true" />
                     <span>Matching boxes light up as you mirror the last played word.</span>
                     <span className="dot" aria-hidden="true" />

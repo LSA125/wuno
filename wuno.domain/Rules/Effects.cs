@@ -1,117 +1,54 @@
-﻿using System.Security.Cryptography;
-using System.Text;
-
-namespace wuno.domain.Rules
+﻿namespace wuno.domain.Rules
 {
-    public sealed class EffectRng
-    {
-        private byte[] _buffer;
-        private int _offset;
-
-        public static EffectRng FromInputs(
-            Guid gameId,
-            int roundIndex,
-            int turnNumber,
-            string word,
-            string? opponentsLast)
-        {
-            using var sha = SHA256.Create();
-            var seedMaterial = $"{gameId:N}|{roundIndex}|{turnNumber}|{word}|{opponentsLast}";
-            var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(seedMaterial));
-            return new EffectRng(bytes);
-        }
-
-        private EffectRng(byte[] seed)
-        {
-            _buffer = seed;
-            _offset = 0;
-        }
-        private uint NextUInt32()
-        {
-            if (_offset + 4 > _buffer.Length)
-            {
-                using var sha = SHA256.Create();
-                var more = sha.ComputeHash(_buffer);
-                Array.Resize(ref _buffer, _buffer.Length + more.Length);
-                Buffer.BlockCopy(more, 0, _buffer, _offset, more.Length);
-            }
-
-            uint val = BitConverter.ToUInt32(_buffer, _offset);
-            _offset += 4;
-            // simple xorshift to decorrelate consecutive pulls
-            val ^= val << 13; val ^= val >> 17; val ^= val << 5;
-            return val;
-        }
-
-        public int Next(int maxExclusive)
-        {
-            if (maxExclusive <= 0) return 0;
-
-            // Rejection sampling to avoid modulo bias
-            uint limit = (uint.MaxValue / (uint)maxExclusive) * (uint)maxExclusive;
-            uint r;
-            do { r = NextUInt32(); } while (r >= limit);
-            return (int)(r % (uint)maxExclusive);
-        }
-    }
-    public record Constraints(char? StartLetter, int MinLen, int DurationSec, bool Require2Vowels, bool FreeStart)
-    {
-        public static Constraints Base(char? start, int turnNumber, string? lastWord) => 
-            new(start, lastWord?.Length ?? Constants.DEFAULT_START_LEN, 
-                Math.Clamp(Constants.DEFAULT_TURN_DUR_SEC - Constants.DEFAULT_TIME_DECREASE_PER_TURN_SEC * turnNumber,
-                    Constants.MIN_TURN_DUR_SEC,
-                    Constants.MAX_TURN_DUR_SEC), 
-                false, false);
-    }
-    public record EffectState(EffectType Type, int Value);
+    public record Constraints(char? StartLetter, int MinLen, int DurationSec);
 
     public static class EffectsLogic
     {
-        public static IEnumerable<(EffectType type, int value, EffectTarget target)> SpecialsFromWord
-            (string word, 
-            string? opponentsLast, 
-            EffectRng rng)
+        /// <summary>
+        /// Tmax = max(40 - 3*personalturns, 5) for first turn
+        /// Tmax = max(25 - 3*personalturns, 5) for subsequent turns
+        /// </summary>
+        public static int CalculateMaxTime(int personalTurns, bool isFirstTurn = false)
         {
-            int revMatchLength = Math.Max(0, Words.ReverseMatchLength(word, opponentsLast ?? "") - 1);
-
-            for (int rev = revMatchLength; rev >= 1; rev--)
-            {
-                // pick target: 0=self, 1=opponent
-                bool toSelf = rng.Next(2) == 0;
-
-                // pick effect bucket: time or min-len, with sign depending on target
-                bool timeEffect = rng.Next(2) == 0;
-
-                if (toSelf && timeEffect)
-                    yield return (EffectType.ADD_TIME, /*value*/ Constants.LOW_TIME_ADJ_SEC, EffectTarget.SELF);
-                else if (toSelf && !timeEffect)
-                    yield return (EffectType.ADJ_MIN_LEN, /*value*/ -Constants.LOW_LEN_ADJ, EffectTarget.SELF);
-                else if (!toSelf && timeEffect)
-                    yield return (EffectType.ADD_TIME, /*value*/ -Constants.LOW_TIME_ADJ_SEC, EffectTarget.NEXT);
-                else
-                    yield return (EffectType.ADJ_MIN_LEN, /*value*/ +Constants.LOW_LEN_ADJ, EffectTarget.NEXT);
-            }
+            int baseTime = isFirstTurn ? Constants.FIRST_TURN_MAX_TIME_SEC : 25;
+            return Math.Max(baseTime - Constants.TIME_DECREASE_PER_TURN_SEC * personalTurns,
+                           Constants.MAX_TIME_FLOOR_SEC);
         }
 
-        public static Constraints Apply(Constraints baseC, List<EffectState> effects)
+        /// <summary>
+        /// Lrequired = max(floor(personalturns/3) - Lminremoved, 0)
+        /// </summary>
+        public static int CalculateMinLength(int personalTurns, int minLenRemoved) =>
+            Math.Max(personalTurns / Constants.SCORE_DIVISOR - minLenRemoved, 0);
+
+        /// <summary>
+        /// Tbonus = score * 0.5
+        /// Lminremoved = floor(score/3)
+        /// </summary>
+        public static (double timeBonus, int minLenRemoved) CalculateBonuses(int score) =>
+            (score * Constants.TIME_BONUS_MULTIPLIER, score / Constants.SCORE_DIVISOR);
+
+        /// <summary>
+        /// Calculate debuffs for opponent based on excess bonuses:
+        /// Tneg = max(Tmax - (Tremaining + score*0.5), 0)
+        /// Ladd = max(floor(score/3) - Lrequired, 0)
+        /// </summary>
+        public static (double timeDebuff, int minLenDebuff) CalculateOpponentDebuffs(
+            double remainingTime, int score, int tMax, int lRequired)
         {
-            var c = baseC with { };
-            foreach (var (type, val) in effects)
-            {
-                switch (type)
-                {
-                    case EffectType.ADD_TIME:
-                        c = c with { DurationSec = Math.Clamp(c.DurationSec + val, 10, 45) }; break;
-                    case EffectType.ADJ_MIN_LEN:
-                        c = c with { MinLen = Math.Max(1, c.MinLen + val) }; break;
-                    case EffectType.FREE_START:
-                        if (val != 0) c = c with { FreeStart = true, StartLetter = null }; break;
-                }
-            }
-            return c;
+            double selfTimeWithBonus = remainingTime + score * Constants.TIME_BONUS_MULTIPLIER;
+            return (Math.Max(tMax - selfTimeWithBonus, 0),
+                    Math.Max(score / Constants.SCORE_DIVISOR - lRequired, 0));
         }
+
+        /// <summary>
+        /// Tactual = max(min(Tlastremaining + Tbonus - Tneg, Tmax), 3)
+        /// </summary>
+        public static int CalculateActualTime(double lastRemaining, double timeBonus,
+            double opponentTimeDebuff, int tMax) =>
+            Math.Max(Math.Min((int)(lastRemaining + timeBonus - opponentTimeDebuff), tMax),
+                    Constants.MIN_ACTUAL_TIME_SEC);
 
         public static char? NextStartLetterFrom(string word) => Words.Last(word);
     }
-
 }

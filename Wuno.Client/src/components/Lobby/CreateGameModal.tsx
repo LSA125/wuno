@@ -12,6 +12,7 @@ export default function CreateGameModal({
 }) {
     const [playerCount, setPlayerCount] = useState(4);
     const [targetWins, setTargetWins] = useState(3);
+    const [isPublic, setIsPublic] = useState(false);
     const [err, setErr] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const nav = useNavigate();
@@ -22,7 +23,7 @@ export default function CreateGameModal({
         if (targetWins < 1 || targetWins > 10) { setErr("Target wins must be 1–10."); return; }
         setBusy(true);
         try {
-            const req: NewGameRequest = { playerCount, targetWins };
+            const req: NewGameRequest = { playerCount, targetWins, isPublic };
             const res = await Api.createGame(req);
             clearPendingJoin();
             console.log("Created game:", res);
@@ -65,6 +66,25 @@ export default function CreateGameModal({
                                 max={10}
                                 onChange={(e) => setTargetWins(parseInt(e.target.value || "0", 10))}
                             />
+                        </div>
+                        <div className="col-12">
+                            <div className="form-check form-switch">
+                                <input
+                                    className="form-check-input"
+                                    type="checkbox"
+                                    id="isPublicSwitch"
+                                    checked={isPublic}
+                                    onChange={(e) => setIsPublic(e.target.checked)}
+                                />
+                                <label className="form-check-label" htmlFor="isPublicSwitch">
+                                    Public Game
+                                </label>
+                            </div>
+                            <small className="text-muted">
+                                {isPublic 
+                                    ? "Anyone can join via Quick Play matchmaking" 
+                                    : "Only players with the game code can join"}
+                            </small>
                         </div>
                     </div>
                     {err && <div className="alert alert-danger mt-3 py-2">{err}</div>}

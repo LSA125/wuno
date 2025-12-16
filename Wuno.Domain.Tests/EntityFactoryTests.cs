@@ -136,7 +136,6 @@ namespace Wuno.Domain.Tests
                 .WithIndex(5)
                 .AtSeat(0)
                 .MinLength(0)
-                .FreeStart()
                 .WithWord("word")
                 .WithEndReason(TurnEndReason.TIMEOUT)
                 .Build();
@@ -147,7 +146,6 @@ namespace Wuno.Domain.Tests
             Assert.Same(round, turn.Round);
             Assert.Equal(5, turn.Index);
             Assert.Equal(0, turn.MinLen);
-            Assert.True(turn.FreeStart);
             Assert.Equal("word", turn.Word);
             Assert.Equal(TurnEndReason.TIMEOUT, turn.EndReason);
             Assert.True(turn.DueAt >= turn.StartedAt);

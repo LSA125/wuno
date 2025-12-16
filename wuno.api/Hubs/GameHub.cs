@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.SignalR;
+﻿using System;
+using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
 using Wuno.Application.Games.Inheritance;
 using Wuno.Application.Games.Util;
@@ -12,6 +13,9 @@ namespace Wuno.Api.Hubs
         private readonly IGroupTracker _tracker;
         private readonly ITypingGate _typingGate;
         private readonly ITurnTimer _turnTimer;
+        private static DateTime EnsureUtc(DateTime value) => value.Kind == DateTimeKind.Utc
+            ? value
+            : DateTime.SpecifyKind(value, DateTimeKind.Utc);
         public GameHub(IGameService svc, IHubContext<GameHub> hub, IGroupTracker tracker, ITypingGate typingGate, ITurnTimer turnTimer)
         {
             _svc = svc;
@@ -72,10 +76,23 @@ namespace Wuno.Api.Hubs
         }
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
-            var ps = RequireSession();
+            // Try to remove from tracker - if not found, nothing to clean up
+            if (!_tracker.Remove(Context.ConnectionId, out var ps, out _))
+            {
+                await base.OnDisconnectedAsync(exception);
+                return;
+            }
+
             var ct = Context.ConnectionAborted;
-            var res = await _svc.DisconnectProtocolAsync(ps.PlayerId, ct);
-            await Clients.Group($"game:{ps.GameId}").SendAsync("PlayersUpdated", res.players, ct);
+            try
+            {
+                var res = await _svc.DisconnectProtocolAsync(ps.PlayerId, ct);
+                await Clients.Group($"game:{ps.GameId}").SendAsync("PlayersUpdated", res.players, ct);
+            }
+            catch
+            {
+                // Best effort - don't fail the disconnect
+            }
             await base.OnDisconnectedAsync(exception);
         }
         public async Task Ready(Guid gameId, bool isReady)
@@ -158,7 +175,5 @@ namespace Wuno.Api.Hubs
                 _turnTimer.Schedule(state.GameId, state.CurrentTurn.TurnId, EnsureUtc(state.CurrentTurn.DueAt), BroadcastAfterTimeout);
             }
         }
-
-        private static DateTime EnsureUtc(DateTime dt) => DateTime.SpecifyKind(dt, DateTimeKind.Utc);
     }
 }

@@ -156,9 +156,9 @@ The frontend runs at `https://localhost:5173` and proxies requests to the backen
 
 - Add spectator and replay features.  
 - Cloud deployment (Azure App Service + SQL).  
-- Unit and integration testing for rules and effects.  
+- Matchmaking and friend lists.
 - AI/bot/single player support.
-- Accessibility and mobile layout enhancements.  
+- Accessibility and mobile layout enhancements.
 
 ---
 
