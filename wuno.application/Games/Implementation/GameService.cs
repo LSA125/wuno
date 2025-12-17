@@ -667,7 +667,7 @@ namespace Wuno.Application.Games.Implementation
             // Find a public game with open slots
             var publicGame = await _db.Games
                 .Include(g => g.Players)
-                .Where(g => g.IsPublic && g.Status == GameStatus.WAITING)
+                .Where(g => g.IsPublic)
                 .Where(g => g.Players.Any(p => !p.IsTaken))
                 .OrderBy(g => g.CreatedAt)
                 .FirstOrDefaultAsync(ct);
