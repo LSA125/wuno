@@ -256,6 +256,67 @@ public sealed class GameServiceTests
         Assert.All(updated.Turns, t => Assert.NotNull(t.EndedAt));
         Assert.Empty(timer.Scheduled);
     }
+    [Fact]
+    public async Task StartMatchAsync_resets_player_remaining_time_to_initial()
+    {
+        var factory = new SqliteInMemoryAppDbContextFactory();
+        
+        // Player starts with custom time that should be reset at match start
+        var seedGame = new GameBuilder()
+            .WithStatus(GameStatus.WAITING)
+            .AddPlayer(new PlayerBuilder().AtSeat(1).WithRemainingTime(20.0))
+            .AddPlayer(new PlayerBuilder().AtSeat(2).WithRemainingTime(10.0))
+            .Build();
+
+        using var db = factory.CreateContext();
+        var service = CreateService(db);
+        db.Games.Add(seedGame);
+        await db.SaveChangesAsync();
+
+        var turn = await service.StartMatchAsync(seedGame.Id, CancellationToken.None);
+
+        // At match start, ResetPlayers() should reset all players to INITIAL_REMAINING_TIME_SEC (30)
+        // So the first turn should use 30s (or capped by tMax/MIN_ACTUAL_TIME_SEC)
+        var durationSeconds = (turn.DueAt - turn.StartedAt).TotalSeconds;
+        
+        // First turn max time is 40, initial time is 30, so duration should be 30
+        Assert.Equal(30, (int)durationSeconds);
+    }
+
+    [Fact]
+    public async Task ProcessTurnAsync_next_player_turn_uses_their_remaining_time()
+    {
+        var factory = new SqliteInMemoryAppDbContextFactory();
+        var player2RemainingTime = 8.0;  // Custom short time for player 2
+        
+        var game = new GameBuilder()
+            .WithStatus(GameStatus.ACTIVE)
+            .AddPlayer(new PlayerBuilder().AtSeat(1).WithRemainingTime(15.0))
+            .AddPlayer(new PlayerBuilder().AtSeat(2).WithRemainingTime(player2RemainingTime))
+            .AddRound(new RoundBuilder().WithIndex(0))
+            .AddTurn(new TurnBuilder().WithIndex(0).AtSeat(1))
+            .CurrentSeat(1)
+            .Build();
+        
+        using var db = factory.CreateContext(ctx => ctx.Add(game));
+        var service = CreateService(db);
+        game.CurrentTurn = game.Turns[0];
+        game.CurrentRound = game.Rounds[0];
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+
+        // Player 1 submits a word, starting player 2's turn
+        var result = await service.ProcessTurnAsync(game.Id, game.Rounds[0].Id, game.Turns[0].Id, game.Players[0].Id, 1, "alpha", CancellationToken.None);
+
+        Assert.True(result.Ok);
+        Assert.NotNull(result.State);
+        Assert.Equal(2, result.State!.CurrentTurn.Seat);
+        
+        // Player 2's turn should use their remaining time
+        var turnDuration = (result.State.CurrentTurn.DueAt - result.State.CurrentTurn.StartedAt).TotalSeconds;
+        Assert.True(turnDuration <= player2RemainingTime + 1,  // +1 for any bonus time from scoring
+            $"Turn duration ({turnDuration}s) should respect player 2's remaining time ({player2RemainingTime}s)");
+    }
 
     private sealed class AcceptAllWordList : IWordList
     {

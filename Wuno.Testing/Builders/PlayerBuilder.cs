@@ -18,6 +18,7 @@ namespace Wuno.Testing.Builders
         private int _roundWins;
         private int _turnsPlayed;
         private string? _lastWord;
+        private double _remainingTime = 15.0;  // Default initial time
 
         public PlayerBuilder WithId(Guid id) { _id = id; return this; }
         public PlayerBuilder WithGame(Game game) { _game = game; _gameId = game.Id; return this; }
@@ -33,6 +34,7 @@ namespace Wuno.Testing.Builders
         public PlayerBuilder RoundWins(int wins) { _roundWins = wins; return this; }
         public PlayerBuilder TurnsPlayed(int count) { _turnsPlayed = count; return this; }
         public PlayerBuilder LastWord(string? word) { _lastWord = word; return this; }
+        public PlayerBuilder WithRemainingTime(double time) { _remainingTime = time; return this; }
 
         public Player Build()
         {
@@ -52,6 +54,7 @@ namespace Wuno.Testing.Builders
                 RoundWins = _roundWins,
                 TurnsPlayedThisRound = _turnsPlayed,
                 LastWord = _lastWord,
+                RemainingTime = _remainingTime,
             };
         }
     }

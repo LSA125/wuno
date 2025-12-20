@@ -136,12 +136,15 @@ namespace Wuno.Application.Games.Implementation
         {
             var previous = previousTurn ?? game.CurrentTurn;
             Turn newTurn;
+            
+            // Use the player's actual remaining time, not a constant
+            double playerRemainingTime = nextPlayer.RemainingTime;
 
             if (previous is null)
             {
                 // First turn of round - use first turn max time
                 int tMax = EffectsLogic.CalculateMaxTime(nextPlayer.TurnsPlayedThisRound, isFirstTurn: true);
-                int duration = Math.Max(Math.Min(Constants.INITIAL_REMAINING_TIME_SEC, tMax), Constants.MIN_ACTUAL_TIME_SEC);
+                int duration = Math.Max(Math.Min((int)playerRemainingTime, tMax), Constants.MIN_ACTUAL_TIME_SEC);
 
                 newTurn = new Turn
                 {
@@ -167,16 +170,16 @@ namespace Wuno.Application.Games.Implementation
                     int prevPlayerTMax = EffectsLogic.CalculateMaxTime(personalTurns, isFirstTurn: false);
                     int prevLRequired = EffectsLogic.CalculateMinLength(personalTurns, 0);
                     (opponentTimeDebuff, opponentMinLenDebuff) = EffectsLogic.CalculateOpponentDebuffs(
-                        Constants.INITIAL_REMAINING_TIME_SEC, previousScore, prevPlayerTMax, prevLRequired);
+                        playerRemainingTime, previousScore, prevPlayerTMax, prevLRequired);
                 }
 
                 // Calculate min length with opponent debuff
                 int minLen = EffectsLogic.CalculateMinLength(personalTurns, 0) + opponentMinLenDebuff;
 
-                // Calculate turn duration
+                // Calculate turn duration using player's actual remaining time
                 int tMax = EffectsLogic.CalculateMaxTime(personalTurns, isFirstTurn: false);
                 int duration = EffectsLogic.CalculateActualTime(
-                    Constants.INITIAL_REMAINING_TIME_SEC, 0, opponentTimeDebuff, tMax);
+                    playerRemainingTime, 0, opponentTimeDebuff, tMax);
 
                 newTurn = new Turn
                 {
