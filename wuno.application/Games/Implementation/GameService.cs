@@ -509,15 +509,19 @@ namespace Wuno.Application.Games.Implementation
             await _db.SaveChangesAsync(ct);
             return (player.GameId, await GetPlayersAsync(player.GameId, ct));
         }
-        async public Task LeaveGameAsync(Guid userId, CancellationToken ct)
+        async public Task<Guid?> LeaveGameAsync(Guid userId, CancellationToken ct)
         {
             var user = await _db.Users
                 .Include(u => u.ActivePlayer)
                 .FirstOrDefaultAsync(u => u.Id == userId, ct) ?? throw new Exception("User not found when leaving game");
             
             var player = user.ActivePlayer;
+            Guid? gameId = null;
+            
             if (player != null)
             {
+                gameId = player.GameId;
+                
                 // Reset player slot so another player can take it
                 player.IsConnected = false;
                 player.IsTaken = false;
@@ -529,10 +533,35 @@ namespace Wuno.Application.Games.Implementation
                 player.TurnsPlayedThisRound = 0;
                 player.RemainingTime = Constants.INITIAL_REMAINING_TIME_SEC;
                 player.UserId = null;
+                
+                // Check if there are any taken players left
+                var remainingPlayers = await _db.Players
+                    .CountAsync(p => p.GameId == gameId && p.IsTaken && p.Id != player.Id, ct);
+                
+                if (remainingPlayers <= 1)
+                {
+                    // 0 or 1 player left - force end the game
+                    var game = await _db.Games.FindAsync([gameId], ct);
+                    if (game != null && game.Status != GameStatus.FINISHED)
+                    {
+                        game.Status = GameStatus.FINISHED;
+                        // Cancel any active turns
+                        var activeTurns = await _db.Turns
+                            .Where(t => t.GameId == gameId && t.EndedAt == null)
+                            .ToListAsync(ct);
+                        foreach (var turn in activeTurns)
+                        {
+                            turn.EndedAt = DateTime.UtcNow;
+                            turn.EndReason = TurnEndReason.END;
+                            _tt.Cancel(turn.Id);
+                        }
+                    }
+                }
             }
             user.ActivePlayer = null;
 
             await _db.SaveChangesAsync(ct);
+            return gameId;
         }
         public async Task<GameState?> TimeoutAndAdvanceAsync(Guid gameId, Guid turnId, CancellationToken ct)
         {

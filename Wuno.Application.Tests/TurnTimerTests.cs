@@ -118,7 +118,7 @@ public sealed class TurnTimerTests
 
         public Task<(Guid gameId, List<PlayerState> players)> DisconnectProtocolAsync(Guid playerId, CancellationToken ct) => Task.FromResult((Guid.Empty, new List<PlayerState>()));
 
-        public Task LeaveGameAsync(Guid userId, CancellationToken ct) => Task.CompletedTask;
+        public Task<Guid?> LeaveGameAsync(Guid userId, CancellationToken ct) => Task.FromResult<Guid?>(null);
 
         public Task<bool> MarkMatchAsStartedAsync(Guid gameId, CancellationToken ct) => Task.FromResult(false);
 

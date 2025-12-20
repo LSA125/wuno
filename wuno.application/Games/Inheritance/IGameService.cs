@@ -18,7 +18,7 @@ namespace Wuno.Application.Games.Inheritance
         Task<JoinGameResponse> JoinGameAsync(Guid gameId, Guid userId, CancellationToken ct);
         Task<ProcessTurnOutcome> ProcessTurnAsync(Guid gameId, Guid roundId, Guid turnId, Guid playerId, int seat, string word, CancellationToken ct);
         Task<(Guid gameId, List<PlayerState> players)> DisconnectProtocolAsync(Guid playerId, CancellationToken ct);
-        Task LeaveGameAsync(Guid userId, CancellationToken ct);
+        Task<Guid?> LeaveGameAsync(Guid userId, CancellationToken ct);
         Task<GameState?> TimeoutAndAdvanceAsync(Guid gameId, Guid turnId, CancellationToken ct);
         Task ForceEndGame(Guid gameId, CancellationToken ct);
         Task<MatchmakingResponse> FindOrCreatePublicGameAsync(CancellationToken ct);
