@@ -104,7 +104,13 @@ builder.Logging.AddConsole();
 builder.Services.AddDataProtection()
   .PersistKeysToDbContext<AppDbContext>()  // Store keys in database for Azure persistence
   .SetApplicationName("WunoApp");
-builder.Services.AddSignalR().AddAzureSignalR(builder.Configuration["Azure:SignalR:ConnectionString"]!);
+
+// Only add Azure SignalR if connection string is configured (production)
+var signalRConnectionString = builder.Configuration["Azure:SignalR:ConnectionString"];
+if (!string.IsNullOrEmpty(signalRConnectionString))
+{
+    builder.Services.AddSignalR().AddAzureSignalR(signalRConnectionString);
+}
 
 
 var app = builder.Build();
