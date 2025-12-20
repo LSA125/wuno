@@ -1,13 +1,18 @@
 // Lightweight JSON client + typed helpers for your endpoints
 import { RegUserRequest, TmpUserRequest, UserResponse, NewGameRequest, NewGameResponse, GameCodeResponse, UserStatsResponse, InGameStatsResponse, MatchmakingResponse } from "./types";
 
+// Use VITE_API_URL in production, empty string for local dev (Vite proxy handles it)
+const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
 export async function request<T>(
     input: RequestInfo,
     init?: RequestInit,
     opts?: { ignore401?: boolean }     // <-- add this
 ): Promise<T> {
-    const res = await fetch(input, {
+    // Prepend API base URL for production deployment
+    const url = typeof input === "string" ? `${API_BASE_URL}${input}` : input;
+    
+    const res = await fetch(url, {
         credentials: "include",
         headers: {
             "Content-Type": "application/json",

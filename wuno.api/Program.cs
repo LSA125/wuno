@@ -52,8 +52,9 @@ builder.Services.AddCors(o =>
 {
     o.AddPolicy("spa", p => p
         .WithOrigins(
-            "https://localhost:5173", // SPA
-            "https://localhost:7031"  // API (if you call it directly sometimes)
+            "https://localhost:5173", // SPA dev
+            "https://localhost:7031", // API dev
+            "https://w-uno.xyz"       // Production frontend
         )
         .AllowAnyHeader()
         .AllowAnyMethod()

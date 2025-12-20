@@ -46,6 +46,8 @@ jobs:
           github_id_token: ${{ steps.idtoken.outputs.result }}
           app_build_command: "npm install && npm run build"
           ###### End of Repository/Build Configurations ######
+        env:
+          VITE_API_URL: "https://wunoapi20251219105819-bka0evdmf6dfh2e9.canadacentral-01.azurewebsites.net"
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
