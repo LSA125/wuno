@@ -22,7 +22,11 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<AppDbContext>(opt =>
-  opt.UseSqlServer(builder.Configuration.GetConnectionString("Default")));
+  opt.UseSqlServer(builder.Configuration.GetConnectionString("Default"),
+  sqlOptions => sqlOptions.EnableRetryOnFailure(
+        maxRetryCount: 5,
+        maxRetryDelay: TimeSpan.FromSeconds(30),
+        errorNumbersToAdd: null)));
 
 builder.Services.AddScoped<IGameService, GameService>();
 builder.Services.AddScoped<IUserService, NoEmailUserService>();
