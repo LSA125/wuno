@@ -1,13 +1,44 @@
 // Lightweight JSON client + typed helpers for your endpoints
-import { RegUserRequest, TmpUserRequest, UserResponse, NewGameRequest, NewGameResponse, GameCodeResponse, UserStatsResponse, InGameStatsResponse, MatchmakingResponse } from "./types";
+import { RegUserRequest, TmpUserRequest, UserResponse, AuthResponse, NewGameRequest, NewGameResponse, GameCodeResponse, UserStatsResponse, InGameStatsResponse, MatchmakingResponse } from "./types";
 
 // Use VITE_API_URL in production, empty string for local dev (Vite proxy handles it)
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
+// Access token storage (persists in localStorage for mobile fallback)
+const ACCESS_TOKEN_KEY = "wuno_access_token";
+
+export function getAccessToken(): string | null {
+    try {
+        return localStorage.getItem(ACCESS_TOKEN_KEY);
+    } catch {
+        return null;
+    }
+}
+
+export function setAccessToken(token: string | null | undefined): void {
+    try {
+        if (token) {
+            localStorage.setItem(ACCESS_TOKEN_KEY, token);
+        } else {
+            localStorage.removeItem(ACCESS_TOKEN_KEY);
+        }
+    } catch {
+        // localStorage not available
+    }
+}
+
+export function clearAccessToken(): void {
+    try {
+        localStorage.removeItem(ACCESS_TOKEN_KEY);
+    } catch {
+        // localStorage not available
+    }
+}
+
 export async function request<T>(
     input: RequestInfo,
     init?: RequestInit,
-    opts?: { ignore401?: boolean }     // <-- add this
+    opts?: { ignore401?: boolean }
 ): Promise<T> {
     // Prepend API base URL for production deployment
     const url = typeof input === "string" ? `${API_BASE_URL}${input}` : input;
@@ -42,6 +73,7 @@ export async function request<T>(
     }
     return json as T;
 }
+
 export const Api = {
     // Users
     getUser: (id: string) => request<UserResponse>(`/api/users/${id}`, { method: "GET" }),
@@ -63,18 +95,18 @@ export const Api = {
 
 export const Auth = {
     login: (body: { username: string; password: string }) =>
-        request(`/api/auth/login`, { method: "POST", body: JSON.stringify(body) }),
+        request<AuthResponse>(`/api/auth/login`, { method: "POST", body: JSON.stringify(body) }),
     logout: () => request(`/api/auth/logout`, { method: "POST" }),
-    me: () => request<UserResponse>(`/api/auth/me`, { method: "GET" }),
-    meSafe: () => request<UserResponse>(`/api/auth/me`, { method: "GET" }, { ignore401: true }),
+    me: () => request<AuthResponse>(`/api/auth/me`, { method: "GET" }),
+    meSafe: () => request<AuthResponse>(`/api/auth/me`, { method: "GET" }, { ignore401: true }),
     register: (body: { tempUserId?: string; username: string; password: string; email?: string | null; iconUrl?: string | null }) =>
-        request <UserResponse>(`/api/auth/register`, { method: "POST", body: JSON.stringify(body) }),
+        request<AuthResponse>(`/api/auth/register`, { method: "POST", body: JSON.stringify(body) }),
+    validateToken: (token: string) =>
+        request<AuthResponse>(`/api/auth/validate-token`, { method: "POST", body: JSON.stringify({ token }) }, { ignore401: true }),
 };
 
 export const Guests = {
     ensure: (b: { name: string; email?: string | null; iconUrl?: string | null }) =>
-        request<UserResponse>(`/api/guests/ensure`, { method: "POST", body: JSON.stringify(b) }),
-    me: () => request<UserResponse>(`/api/guests/me`, { method: "GET" }),
+        request<AuthResponse>(`/api/guests/ensure`, { method: "POST", body: JSON.stringify(b) }),
+    me: () => request<AuthResponse>(`/api/guests/me`, { method: "GET" }),
 };
-
-

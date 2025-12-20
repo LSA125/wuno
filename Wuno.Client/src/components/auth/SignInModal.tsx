@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Auth } from "@/api/client";
+import type { AuthResponse } from "@/api/types";
 
 export default function SignInModal({
     open, onClose, onSuccess
-}: { open: boolean; onClose: () => void; onSuccess: () => void; }) {
+}: { open: boolean; onClose: () => void; onSuccess: (res: AuthResponse) => void; }) {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [busy, setBusy] = useState(false);
@@ -12,11 +13,11 @@ export default function SignInModal({
     const submit = async () => {
         setErr(null); setBusy(true);
         try {
-            await Auth.login({ username, password });
+            const res = await Auth.login({ username, password });
             setPassword(""); // don’t keep it in memory any longer than needed
-            onSuccess();
+            onSuccess(res);
         } catch (e: any) {
-            setErr(e?.msg || "Sign in failed.");
+            setErr(e?.message || e?.msg || "Sign in failed.");
         } finally {
             setBusy(false);
         }

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
 using Wuno.Application.Games.Inheritance;
 using Wuno.Application.Games.Util;
+using Wuno.Api.Services;
 
 namespace Wuno.Api.Hubs
 {
@@ -13,16 +14,18 @@ namespace Wuno.Api.Hubs
         private readonly IGroupTracker _tracker;
         private readonly ITypingGate _typingGate;
         private readonly ITurnTimer _turnTimer;
+        private readonly ITokenService _tokenService;
         private static DateTime EnsureUtc(DateTime value) => value.Kind == DateTimeKind.Utc
             ? value
             : DateTime.SpecifyKind(value, DateTimeKind.Utc);
-        public GameHub(IGameService svc, IHubContext<GameHub> hub, IGroupTracker tracker, ITypingGate typingGate, ITurnTimer turnTimer)
+        public GameHub(IGameService svc, IHubContext<GameHub> hub, IGroupTracker tracker, ITypingGate typingGate, ITurnTimer turnTimer, ITokenService tokenService)
         {
             _svc = svc;
             _hub = hub;
             _tracker = tracker;
             _typingGate = typingGate;
             _turnTimer = turnTimer;
+            _tokenService = tokenService;
         }
         private PlayerSession RequireSession()
         {
@@ -30,11 +33,33 @@ namespace Wuno.Api.Hubs
                 throw new HubException("Not joined.");
             return ps;
         }
+        
+        /// <summary>
+        /// Gets the user ID from cookie claims or access token in query string.
+        /// </summary>
+        private Guid? GetUserId()
+        {
+            // 1. Try cookie-based auth (works on desktop, sometimes on mobile)
+            var sub = Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (Guid.TryParse(sub, out var userId))
+                return userId;
+            
+            // 2. Try access token from query string (mobile fallback)
+            var httpContext = Context.GetHttpContext();
+            var accessToken = httpContext?.Request.Query["access_token"].FirstOrDefault();
+            if (!string.IsNullOrEmpty(accessToken))
+            {
+                return _tokenService.GetUserIdFromToken(accessToken);
+            }
+            
+            return null;
+        }
+        
         public async Task ConnectToGame(string gameCode)
         {
             var ct = Context.ConnectionAborted;
-            var sub = Context.User?.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (!Guid.TryParse(sub, out var userId))
+            var userId = GetUserId();
+            if (!userId.HasValue)
             {
                 await Clients.Caller.SendAsync("ConnectionFailed", "Please pick a guest name first.");
                 return;
@@ -42,9 +67,9 @@ namespace Wuno.Api.Hubs
             try
             {
                 Guid gameId = await _svc.GetGameId(gameCode, ct);
-                JoinGameResponse res = await _svc.JoinGameAsync(gameId, userId, ct);
+                JoinGameResponse res = await _svc.JoinGameAsync(gameId, userId.Value, ct);
                 int seat = res.State.Players.First(p => p.PlayerId == res.PlayerId).Seat;
-                PlayerSession ps = new(gameId, res.PlayerId, seat, userId);
+                PlayerSession ps = new(gameId, res.PlayerId, seat, userId.Value);
 
                 _tracker.Add(Context.ConnectionId, ps);
                 await Groups.AddToGroupAsync(Context.ConnectionId, $"game:{gameId}", ct);

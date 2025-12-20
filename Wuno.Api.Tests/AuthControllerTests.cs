@@ -11,12 +11,13 @@ using wuno.domain.Rules;
 using wuno.infrastructure;
 using Wuno.Domain.Rules;
 using Wuno.Testing.Fixtures;
+using Wuno.Api.Services;
 
 public sealed class AuthControllerTests
 {
     private static AuthController CreateController(AppDbContext db, FakeAuthService auth)
     {
-        var controller = new AuthController(db, new PasswordHasher<User>());
+        var controller = new AuthController(db, new PasswordHasher<User>(), new FakeTokenService());
         var services = new ServiceCollection();
         services.AddSingleton<IAuthenticationService>(auth);
         var sp = services.BuildServiceProvider();
@@ -28,6 +29,14 @@ public sealed class AuthControllerTests
             }
         };
         return controller;
+    }
+    
+    private sealed class FakeTokenService : ITokenService
+    {
+        public string GenerateToken(Guid userId, string? name = null, bool isRegistered = false)
+            => $"fake-token-{userId}";
+        public ClaimsPrincipal? ValidateToken(string token) => null;
+        public Guid? GetUserIdFromToken(string token) => null;
     }
 
     [Fact]

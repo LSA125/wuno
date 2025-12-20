@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Guests } from "@/api/client";
-import type { TmpUserRequest, UserResponse } from "@/api/types";
+import type { AuthResponse } from "@/api/types";
 
 export default function FirstTimeModal({
     open,
@@ -9,7 +9,7 @@ export default function FirstTimeModal({
 }: {
     open: boolean;
     onClose: () => void;
-    onSuccess: (newId: string, u: UserResponse) => void;
+    onSuccess: (newId: string, u: AuthResponse) => void;
 }) {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");

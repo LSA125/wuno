@@ -6,7 +6,7 @@ import { useState } from "react";
 import { clearCookie } from "@/auth/cookies";
 import { useToast } from "@/context/ToastContext";
 import { useNavigate } from "react-router-dom";
-import { Auth } from "@/api/client";
+import { Auth, clearAccessToken } from "@/api/client";
 import DefaultAvatar from "@/assets/DefaultAvatar.svg"
 export default function ProfileCard() {
     const { user, setUser } = useUser();
@@ -28,6 +28,7 @@ export default function ProfileCard() {
             // local cleanup always
             setUser(null);
             clearCookie();                           // clears *guest* cookie only
+            clearAccessToken();                      // clears access token from localStorage
             sessionStorage.setItem("signed_out", "1");
 
             // if you have a SignalR connection, stop it here to avoid auto-rejoins

@@ -4,6 +4,7 @@ using Wuno.Api.Hubs;
 using Wuno.Application.Games.Inheritance;
 using Wuno.Application.Games.Util;
 using Wuno.Testing.SignalR;
+using Wuno.Api.Services;
 
 namespace Wuno.Api.Tests
 {
@@ -52,7 +53,7 @@ namespace Wuno.Api.Tests
 
         private static GameHub CreateHub(FakeGameService service, IGroupTracker tracker, Testing.Fixtures.FakeTurnTimer timer, IHubContext<GameHub> hubContext, TestHubCallerClients clients, Guid userId)
         {
-            var hub = new GameHub(service, hubContext, tracker, new AllowTypingGate(), timer)
+            var hub = new GameHub(service, hubContext, tracker, new AllowTypingGate(), timer, new FakeTokenService())
             {
                 Context = new TestHubCallerContext("conn-1", new ClaimsPrincipal(new ClaimsIdentity(
                 [
@@ -67,6 +68,14 @@ namespace Wuno.Api.Tests
         private sealed class AllowTypingGate : ITypingGate
         {
             public bool tryAllow(string key, TimeSpan interval) => true;
+        }
+        
+        private sealed class FakeTokenService : ITokenService
+        {
+            public string GenerateToken(Guid userId, string? name = null, bool isRegistered = false)
+                => $"fake-token-{userId}";
+            public ClaimsPrincipal? ValidateToken(string token) => null;
+            public Guid? GetUserIdFromToken(string token) => null;
         }
 
         private sealed class InMemoryGroupTracker : IGroupTracker

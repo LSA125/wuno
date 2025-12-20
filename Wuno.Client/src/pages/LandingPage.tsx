@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCookie, setCookie } from "@/auth/cookies";
-import { Api, Auth } from "@/api/client";
+import { Api, Auth, getAccessToken, setAccessToken } from "@/api/client";
 import { normalizeUser, useUser } from "@/context/UserContext";
 import FirstTimeModal from "@/components/lobby/FirstTimeModal";
 import RegisterModal from "@/components/lobby/RegisterModal";
 import { getPendingJoin } from "@/utils/pendingJoin";
 import SignInModal from "@/components/auth/SignInModal";
 import { useToast } from "@/context/ToastContext";
-import type { UserResponse } from "@/api/types";
+import type { AuthResponse, UserResponse } from "@/api/types";
 import { tryAutoRejoin } from "@/utils/autoRejoin";
 
 export default function LandingPage() {
@@ -27,7 +27,7 @@ export default function LandingPage() {
             sessionStorage.removeItem("auth_expired");
         }
         if (sessionStorage.getItem("signed_out") === "1") {
-            push("You’ve been signed out successfully.");
+            push("You've been signed out successfully.");
             sessionStorage.removeItem("signed_out");
         }
     }, [push]);
@@ -37,10 +37,12 @@ export default function LandingPage() {
         ran.current = true;
 
         (async () => {
-            // 1) Registered session
+            // 1) Try cookie-based auth first (works on desktop)
             try {
-                const me: UserResponse = await Auth.meSafe();
+                const me: AuthResponse = await Auth.meSafe();
                 if (me?.ok) {
+                    // Store/refresh the access token
+                    setAccessToken(me.accessToken);
                     const u = normalizeUser(me, true);
                     setUser(u);
 
@@ -51,7 +53,27 @@ export default function LandingPage() {
                 }
             } catch { }
 
-            // 2) Guest cookie
+            // 2) Try access token from localStorage (mobile fallback)
+            const storedToken = getAccessToken();
+            if (storedToken) {
+                try {
+                    const res: AuthResponse = await Auth.validateToken(storedToken);
+                    if (res?.ok) {
+                        // Refresh the token
+                        setAccessToken(res.accessToken);
+                        const isRegistered = true; // Token validation means they were logged in
+                        const u = normalizeUser(res, isRegistered);
+                        setUser(u);
+
+                        const auto = await tryAutoRejoin(u);
+                        const pending = getPendingJoin();
+                        nav((pending || auto) ? `/game/${pending || auto}` : "/lobby", { replace: true });
+                        return;
+                    }
+                } catch { }
+            }
+
+            // 3) Guest cookie (legacy fallback)
             const uid = getCookie();
             if (uid) {
                 try {
@@ -72,7 +94,9 @@ export default function LandingPage() {
         })();
     }, [nav, setUser]);
 
-    const afterAuth = async (id: string, ures: UserResponse) => {
+    const afterAuth = async (id: string, ures: AuthResponse) => {
+        // Store access token for mobile fallback
+        setAccessToken(ures.accessToken);
         const u = normalizeUser(ures, false);
         setUser(u);
         const auto = await tryAutoRejoin(u);
@@ -80,15 +104,14 @@ export default function LandingPage() {
         nav((pending || auto) ? `/game/${pending || auto}` : "/lobby", { replace: true });
     };
 
-    const onSignedIn = async () => {
-        const me: UserResponse = await Auth.me();
-        if (me?.ok) {
-            const u = normalizeUser(me, true);
-            setUser(u);
-            const auto = await tryAutoRejoin(u);
-            const pending = getPendingJoin();
-            nav((pending || auto) ? `/game/${pending || auto}` : "/lobby", { replace: true });
-        }
+    const onSignedIn = async (loginRes: AuthResponse) => {
+        // Store access token for mobile fallback
+        setAccessToken(loginRes.accessToken);
+        const u = normalizeUser(loginRes, true);
+        setUser(u);
+        const auto = await tryAutoRejoin(u);
+        const pending = getPendingJoin();
+        nav((pending || auto) ? `/game/${pending || auto}` : "/lobby", { replace: true });
     };
 
     if (loading) return null;

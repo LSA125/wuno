@@ -8,6 +8,7 @@ using wuno.domain;
 using Wuno.Application.Games;
 using wuno.infrastructure;
 using Wuno.Application.Games.Util;
+using Wuno.Api.Services;
 
 [ApiController]
 [Route("api/guests")]
@@ -15,9 +16,12 @@ using Wuno.Application.Games.Util;
 public sealed class GuestsController : ControllerBase
 {
     private readonly AppDbContext _db;
-    public GuestsController(AppDbContext db)
+    private readonly ITokenService _tokenService;
+    
+    public GuestsController(AppDbContext db, ITokenService tokenService)
     {
         _db = db;
+        _tokenService = tokenService;
     }
 
     public sealed record EnsureGuestReq(string Name, string? Email, string? IconUrl);
@@ -54,7 +58,7 @@ public sealed class GuestsController : ControllerBase
             // NOTE: Do NOT set the gid cookie here; the middleware already did it.
         }
 
-        // Update the guest’s display info
+        // Update the guest's display info
         var u = await _db.Users.FirstOrDefaultAsync(x => x.Id == userId, ct);
         if (u is null) return Unauthorized(new { msg = "Guest session invalid." });
 
@@ -75,7 +79,10 @@ public sealed class GuestsController : ControllerBase
             CookieAuthenticationDefaults.AuthenticationScheme,
             new ClaimsPrincipal(id));
 
-        return Ok(new UserResponse(true, u.Id, u.Name, u.IconUrl, u.Email, null));
+        // Generate access token for mobile fallback
+        var accessToken = _tokenService.GenerateToken(u.Id, u.Name, isRegistered: false);
+
+        return Ok(new AuthResponse(true, u.Id, u.Name, u.IconUrl, u.Email, null, accessToken));
     }
 
     [HttpGet("me")]
@@ -87,6 +94,9 @@ public sealed class GuestsController : ControllerBase
         var u = await _db.Users.FindAsync([userId], ct);
         if (u is null) return NotFound();
 
-        return Ok(new UserResponse(true, u.Id, u.Name, u.IconUrl, u.Email, null));
+        // Generate access token for mobile fallback
+        var accessToken = _tokenService.GenerateToken(u.Id, u.Name, isRegistered: u.IsRegistered);
+
+        return Ok(new AuthResponse(true, u.Id, u.Name, u.IconUrl, u.Email, null, accessToken));
     }
 }

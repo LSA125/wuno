@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Wuno.Application.Games;
 using Wuno.Domain.Rules;
 using Wuno.Application.Games.Util;
+using Wuno.Api.Services;
 
 [ApiController]
 [Route("api/auth")]
@@ -17,9 +18,13 @@ public sealed class AuthController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly IPasswordHasher<User> _hasher;
-    public AuthController(AppDbContext db, IPasswordHasher<User> hasher)
+    private readonly ITokenService _tokenService;
+    
+    public AuthController(AppDbContext db, IPasswordHasher<User> hasher, ITokenService tokenService)
     {
-        _db = db; _hasher = hasher;
+        _db = db;
+        _hasher = hasher;
+        _tokenService = tokenService;
     }
 
     public record LoginRequest(string Username, string Password);
@@ -52,7 +57,17 @@ public sealed class AuthController : ControllerBase
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,
             new ClaimsPrincipal(id));
 
-        return Ok(new { ok = true });
+        // Generate access token for mobile fallback
+        var accessToken = _tokenService.GenerateToken(user.Id, user.Name, isRegistered: true);
+
+        return Ok(new AuthResponse(
+            Ok: true,
+            UserId: user.Id,
+            Name: user.Name,
+            IconUrl: user.IconUrl,
+            Email: user.Email,
+            Msg: null,
+            AccessToken: accessToken));
     }
 
     [HttpPost("logout")]
@@ -72,15 +87,51 @@ public sealed class AuthController : ControllerBase
         var u = await _db.Users.FindAsync([userId], ct);
         if (u is null) return Unauthorized();
 
-        return Ok(new UserResponse(
+        // Generate fresh token for session
+        var accessToken = _tokenService.GenerateToken(u.Id, u.Name, isRegistered: u.IsRegistered);
+
+        return Ok(new AuthResponse(
             Ok: true,
             UserId: u.Id,
             Name: u.Name,
             IconUrl: u.IconUrl,
             Email: u.Email,
-            Msg: null));
+            Msg: null,
+            AccessToken: accessToken));
     }
 
+    /// <summary>
+    /// Validate an access token and return user info. Used for session restoration on mobile.
+    /// </summary>
+    [HttpPost("validate-token")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ValidateToken([FromBody] ValidateTokenRequest req, CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(req.Token))
+            return BadRequest(new { msg = "Token required." });
+
+        var userId = _tokenService.GetUserIdFromToken(req.Token);
+        if (!userId.HasValue)
+            return Unauthorized(new { msg = "Invalid or expired token." });
+
+        var u = await _db.Users.FindAsync([userId.Value], ct);
+        if (u is null)
+            return Unauthorized(new { msg = "User not found." });
+
+        // Generate fresh token
+        var freshToken = _tokenService.GenerateToken(u.Id, u.Name, isRegistered: u.IsRegistered);
+
+        return Ok(new AuthResponse(
+            Ok: true,
+            UserId: u.Id,
+            Name: u.Name,
+            IconUrl: u.IconUrl,
+            Email: u.Email,
+            Msg: null,
+            AccessToken: freshToken));
+    }
+
+    public record ValidateTokenRequest(string Token);
     public record RegisterRequest(Guid? TempUserId, string Username, string Password, string? Email, string? IconUrl);
 
     [HttpPost("register")]
@@ -139,12 +190,16 @@ public sealed class AuthController : ControllerBase
         var id = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(id));
 
-        return Ok(new UserResponse(
+        // Generate access token for mobile fallback
+        var accessToken = _tokenService.GenerateToken(user.Id, user.Name, isRegistered: true);
+
+        return Ok(new AuthResponse(
             Ok: true,
             UserId: user.Id,
             Name: user.Name,
             IconUrl: user.IconUrl,
             Email: user.Email,
-            Msg: null));
+            Msg: null,
+            AccessToken: accessToken));
     }
 }
