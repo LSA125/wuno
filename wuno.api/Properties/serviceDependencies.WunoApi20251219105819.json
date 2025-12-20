@@ -3,10 +3,9 @@
     "signalr1": {
       "serviceConnectorResourceId": "/subscriptions/[parameters('subscriptionId')]/resourceGroups/[parameters('serviceConnectorResourceGroupName')]/providers/Microsoft.Web/sites/WunoApi20251219105819/providers/Microsoft.ServiceLinker/linkers/AzureSignalRConnectionString_B20ABCAE9D",
       "secretStore": "AzureAppSettings",
-      "resourceId": "/subscriptions/[parameters('subscriptionId')]/resourceGroups/[parameters('resourceGroupName')]/providers/Microsoft.SignalRService/SignalR/SteamerfyServer",
+      "resourceId": "/subscriptions/[parameters('subscriptionId')]/resourceGroups/[parameters('resourceGroupName')]/providers/Microsoft.SignalRService/SignalR/WunoSignalr",
       "type": "signalr.azure",
-      "connectionId": "Azure:SignalR:ConnectionString",
-      "dynamicId": null
+      "connectionId": "Azure:SignalR:ConnectionString"
     }
   }
 }
