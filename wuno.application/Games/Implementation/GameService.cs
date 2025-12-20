@@ -198,142 +198,147 @@ namespace Wuno.Application.Games.Implementation
         }
         public async Task<ProcessTurnOutcome> ProcessTurnAsync(Guid gameId, Guid roundId, Guid turnId, Guid playerId, int seat, string word, CancellationToken ct)
         {
-            var now = DateTime.UtcNow;
-            await using IDbContextTransaction tx = await _db.Database.BeginTransactionAsync(ct);
-
-            Game? game = await _db.Games
-                .Include(g => g.Players)
-                .Include(g => g.CurrentRound)
-                .Include(g => g.CurrentTurn)
-                .FirstOrDefaultAsync(g => g.Id == gameId, ct);
-
-            if (game is null || game.CurrentTurn is null || game.CurrentRound is null || game.CurrentTurn.Id != turnId || game.CurrentRound.Id != roundId)
+            var strategy = _db.Database.CreateExecutionStrategy();
+            
+            return await strategy.ExecuteAsync(async () =>
             {
-                return new(false, "Not found", null, null);
-            }
+                var now = DateTime.UtcNow;
+                await using IDbContextTransaction tx = await _db.Database.BeginTransactionAsync(ct);
 
-            Turn currentTurn = game.CurrentTurn;
-            if (currentTurn.EndedAt != null)
-            {
-                return new(false, "Turn already processed", null, null);
-            }
+                Game? game = await _db.Games
+                    .Include(g => g.Players)
+                    .Include(g => g.CurrentRound)
+                    .Include(g => g.CurrentTurn)
+                    .FirstOrDefaultAsync(g => g.Id == gameId, ct);
 
-            Player? player = game.Players.SingleOrDefault(p => p.Id == playerId);
-            if (player is null || player.Seat != seat || currentTurn.Seat != seat)
-            {
-                return new(false, "Not your turn", null, null);
-            }
-
-            int personalIndex = player.TurnsPlayedThisRound;
-            bool timedOut = now > currentTurn.DueAt;
-            TurnHistoryState? completedTurn = null;
-            int wordScore = 0;
-
-            if (timedOut)
-            {
-                currentTurn.EndedAt = now;
-                currentTurn.EndReason = TurnEndReason.TIMEOUT;
-                player.IsActive = false;
-                player.TurnsPlayedThisRound += 1;
-                // Reset remaining time on timeout
-                player.RemainingTime = 0;
-            }
-            else
-            {
-                var w = word;
-                if (!_wl.IsWord(w)) return new(false, "Not a valid word", null, null);
-                if (w.Length < currentTurn.MinLen) return new(false, $"Word too short (min {currentTurn.MinLen})", null, null);
-                if (!game.LastWord.IsNullOrEmpty()
-                    && w.First() != game.LastWord!.Last())
+                if (game is null || game.CurrentTurn is null || game.CurrentRound is null || game.CurrentTurn.Id != turnId || game.CurrentRound.Id != roundId)
                 {
-                    return new(false, $"Word must start with '{game.LastWord!.Last()}'", null, null);
-                }
-                bool playedThisRound = await _db.Turns.AnyAsync(t => t.GameId == gameId && t.RoundId == roundId && t.Word == w, ct);
-                if (playedThisRound) return new(false, "Word already played this round", null, null);
-
-                // Calculate score based on reverse match with opponent's last word
-                wordScore = LetterScoring.CalculateScore(w, game.LastWord);
-
-                // Calculate remaining time: actual time left + bonus from score
-                double actualTimeRemaining = Math.Max(0, (currentTurn.DueAt - now).TotalSeconds);
-                var (timeBonus, _) = EffectsLogic.CalculateBonuses(wordScore);
-                player.RemainingTime = actualTimeRemaining + timeBonus;
-
-                currentTurn.Word = w;
-                currentTurn.Score = wordScore;
-                currentTurn.EndedAt = now;
-                currentTurn.EndReason = TurnEndReason.END;
-                player.LastWord = w;
-                player.TurnsPlayedThisRound += 1;
-                game.LastWord = w;
-                completedTurn = new TurnHistoryState(currentTurn.Id, currentTurn.Index, seat, w, currentTurn.MinLen, wordScore);
-            }
-
-            bool roundEnded = game.Players.Count(p => p.IsTaken && p.IsActive) <= 1;
-            bool matchEnded = false;
-
-            TurnState? currentTurnState = null;
-
-            if (roundEnded)
-            {
-                Round round = game.CurrentRound;
-                Player? winner = game.Players.FirstOrDefault(p => p.IsActive && p.IsTaken);
-                game.LastWord = null;
-                round.EndedAt = now;
-                round.WinnerId = winner?.Id;
-                if (winner is not null)
-                {
-                    winner.RoundWins += 1;
-                    matchEnded = winner.RoundWins >= game.TargetWins || game.Players.Count(p => p.IsTaken) <= 1; ;
+                    return new ProcessTurnOutcome(false, "Not found", null, null);
                 }
 
-                if (matchEnded)
+                Turn currentTurn = game.CurrentTurn;
+                if (currentTurn.EndedAt != null)
                 {
-                    game.Status = GameStatus.FINISHED;
+                    return new ProcessTurnOutcome(false, "Turn already processed", null, null);
+                }
+
+                Player? player = game.Players.SingleOrDefault(p => p.Id == playerId);
+                if (player is null || player.Seat != seat || currentTurn.Seat != seat)
+                {
+                    return new ProcessTurnOutcome(false, "Not your turn", null, null);
+                }
+
+                int personalIndex = player.TurnsPlayedThisRound;
+                bool timedOut = now > currentTurn.DueAt;
+                TurnHistoryState? completedTurn = null;
+                int wordScore = 0;
+
+                if (timedOut)
+                {
+                    currentTurn.EndedAt = now;
+                    currentTurn.EndReason = TurnEndReason.TIMEOUT;
+                    player.IsActive = false;
+                    player.TurnsPlayedThisRound += 1;
+                    // Reset remaining time on timeout
+                    player.RemainingTime = 0;
                 }
                 else
                 {
-                    ResetPlayers(game.Players);
-                    int startSeat = winner?.Seat ?? 1;
-                    Round nextRound = new()
+                    var w = word;
+                    if (!_wl.IsWord(w)) return new ProcessTurnOutcome(false, "Not a valid word", null, null);
+                    if (w.Length < currentTurn.MinLen) return new ProcessTurnOutcome(false, $"Word too short (min {currentTurn.MinLen})", null, null);
+                    if (!game.LastWord.IsNullOrEmpty()
+                        && w.First() != game.LastWord!.Last())
                     {
-                        GameId = game.Id,
-                        Index = await _db.Rounds.CountAsync(r => r.GameId == game.Id, ct),
-                        StartedAt = now
-                    };
-                    _db.Rounds.Add(nextRound);
-                    game.Rounds.Add(nextRound);
-                    game.CurrentRound = nextRound;
+                        return new ProcessTurnOutcome(false, $"Word must start with '{game.LastWord!.Last()}'", null, null);
+                    }
+                    bool playedThisRound = await _db.Turns.AnyAsync(t => t.GameId == gameId && t.RoundId == roundId && t.Word == w, ct);
+                    if (playedThisRound) return new ProcessTurnOutcome(false, "Word already played this round", null, null);
 
-                    Player? firstPlayer = FindNextValidPlayer(game.Players, startSeat - 1)
-                        ?? throw new Exception("No valid player to start round");
+                    // Calculate score based on reverse match with opponent's last word
+                    wordScore = LetterScoring.CalculateScore(w, game.LastWord);
 
-                    currentTurnState = await CreateTurnAsync(game, nextRound, firstPlayer, now, ct);
+                    // Calculate remaining time: actual time left + bonus from score
+                    double actualTimeRemaining = Math.Max(0, (currentTurn.DueAt - now).TotalSeconds);
+                    var (timeBonus, _) = EffectsLogic.CalculateBonuses(wordScore);
+                    player.RemainingTime = actualTimeRemaining + timeBonus;
+
+                    currentTurn.Word = w;
+                    currentTurn.Score = wordScore;
+                    currentTurn.EndedAt = now;
+                    currentTurn.EndReason = TurnEndReason.END;
+                    player.LastWord = w;
+                    player.TurnsPlayedThisRound += 1;
+                    game.LastWord = w;
+                    completedTurn = new TurnHistoryState(currentTurn.Id, currentTurn.Index, seat, w, currentTurn.MinLen, wordScore);
                 }
-            }
 
-            if (!roundEnded)
-            {
-                Player? nextPlayer = FindNextValidPlayer(game.Players, game.CurSeat)
-                    ?? throw new Exception("No valid player to start turn");
-                currentTurnState = await CreateTurnAsync(game, game.CurrentRound!, nextPlayer, now, ct, currentTurn, wordScore);
-            }
+                bool roundEnded = game.Players.Count(p => p.IsTaken && p.IsActive) <= 1;
+                bool matchEnded = false;
 
-            if (currentTurnState is null)
-            {
-                currentTurnState = BuildTurnState(currentTurn);
-            }
+                TurnState? currentTurnState = null;
 
-            await _db.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
+                if (roundEnded)
+                {
+                    Round round = game.CurrentRound;
+                    Player? winner = game.Players.FirstOrDefault(p => p.IsActive && p.IsTaken);
+                    game.LastWord = null;
+                    round.EndedAt = now;
+                    round.WinnerId = winner?.Id;
+                    if (winner is not null)
+                    {
+                        winner.RoundWins += 1;
+                        matchEnded = winner.RoundWins >= game.TargetWins || game.Players.Count(p => p.IsTaken) <= 1; ;
+                    }
 
-            List<PlayerState> players = [.. game.Players
-                .Where(p => p.IsTaken)
-                .Select(State.PlayerToState)];
-            RoundState roundState = State.RoundToState(game.CurrentRound!);
-            GameState state = State.GameToState(game, players, roundState, currentTurnState);
+                    if (matchEnded)
+                    {
+                        game.Status = GameStatus.FINISHED;
+                    }
+                    else
+                    {
+                        ResetPlayers(game.Players);
+                        int startSeat = winner?.Seat ?? 1;
+                        Round nextRound = new()
+                        {
+                            GameId = game.Id,
+                            Index = await _db.Rounds.CountAsync(r => r.GameId == game.Id, ct),
+                            StartedAt = now
+                        };
+                        _db.Rounds.Add(nextRound);
+                        game.Rounds.Add(nextRound);
+                        game.CurrentRound = nextRound;
 
-            return new(true, null, state, completedTurn);
+                        Player? firstPlayer = FindNextValidPlayer(game.Players, startSeat - 1)
+                            ?? throw new Exception("No valid player to start round");
+
+                        currentTurnState = await CreateTurnAsync(game, nextRound, firstPlayer, now, ct);
+                    }
+                }
+
+                if (!roundEnded)
+                {
+                    Player? nextPlayer = FindNextValidPlayer(game.Players, game.CurSeat)
+                        ?? throw new Exception("No valid player to start turn");
+                    currentTurnState = await CreateTurnAsync(game, game.CurrentRound!, nextPlayer, now, ct, currentTurn, wordScore);
+                }
+
+                if (currentTurnState is null)
+                {
+                    currentTurnState = BuildTurnState(currentTurn);
+                }
+
+                await _db.SaveChangesAsync(ct);
+                await tx.CommitAsync(ct);
+
+                List<PlayerState> players = [.. game.Players
+                    .Where(p => p.IsTaken)
+                    .Select(State.PlayerToState)];
+                RoundState roundState = State.RoundToState(game.CurrentRound!);
+                GameState state = State.GameToState(game, players, roundState, currentTurnState);
+
+                return new ProcessTurnOutcome(true, null, state, completedTurn);
+            });
         }
         public async Task<List<PlayerState>> GetPlayersAsync(Guid gameId, CancellationToken ct)
         {
@@ -565,112 +570,117 @@ namespace Wuno.Application.Games.Implementation
         }
         public async Task<GameState?> TimeoutAndAdvanceAsync(Guid gameId, Guid turnId, CancellationToken ct)
         {
-            var now = DateTime.UtcNow;
-            await using IDbContextTransaction tx = await _db.Database.BeginTransactionAsync(ct);
-
-            Game? game = await _db.Games
-                .Include(g => g.Players)
-                .Include(g => g.CurrentRound)
-                .Include(g => g.CurrentTurn)
-                .FirstOrDefaultAsync(g => g.Id == gameId, ct);
-
-            if (game is null || game.CurrentTurn is null || game.CurrentRound is null || game.CurrentTurn.Id != turnId)
+            var strategy = _db.Database.CreateExecutionStrategy();
+            
+            return await strategy.ExecuteAsync(async () =>
             {
-                return null;
-            }
+                var now = DateTime.UtcNow;
+                await using IDbContextTransaction tx = await _db.Database.BeginTransactionAsync(ct);
 
-            Turn currentTurn = game.CurrentTurn;
-            if (currentTurn.EndedAt != null)
-            {
-                return null;
-            }
+                Game? game = await _db.Games
+                    .Include(g => g.Players)
+                    .Include(g => g.CurrentRound)
+                    .Include(g => g.CurrentTurn)
+                    .FirstOrDefaultAsync(g => g.Id == gameId, ct);
 
-            Player? player = game.Players.SingleOrDefault(p => p.Seat == currentTurn.Seat);
-            if (player is null)
-            {
-                return null;
-            }
-
-            int personalIndex = player.TurnsPlayedThisRound;
-            bool timedOut = now >= currentTurn.DueAt;
-
-            if (timedOut)
-            {
-                currentTurn.EndedAt = now;
-                currentTurn.EndReason = TurnEndReason.TIMEOUT;
-                player.IsActive = false;
-                player.TurnsPlayedThisRound += 1;
-            }
-            else
-            {
-                return null;
-            }
-
-            bool roundEnded = game.Players.Count(p => p.IsTaken && p.IsActive) <= 1;
-            bool matchEnded = false;
-
-            TurnState? currentTurnState = null;
-
-            if (roundEnded)
-            {
-                Round round = game.CurrentRound;
-                Player? winner = game.Players.FirstOrDefault(p => p.IsActive && p.IsTaken);
-                game.LastWord = null;
-                round.EndedAt = now;
-                round.WinnerId = winner?.Id;
-                if (winner is not null)
+                if (game is null || game.CurrentTurn is null || game.CurrentRound is null || game.CurrentTurn.Id != turnId)
                 {
-                    winner.RoundWins += 1;
-                    matchEnded = winner.RoundWins >= game.TargetWins || game.Players.Count(p => p.IsTaken) <= 1;
+                    return null;
                 }
 
-                if (matchEnded)
+                Turn currentTurn = game.CurrentTurn;
+                if (currentTurn.EndedAt != null)
                 {
-                    game.Status = GameStatus.FINISHED;
+                    return null;
+                }
+
+                Player? player = game.Players.SingleOrDefault(p => p.Seat == currentTurn.Seat);
+                if (player is null)
+                {
+                    return null;
+                }
+
+                int personalIndex = player.TurnsPlayedThisRound;
+                bool timedOut = now >= currentTurn.DueAt;
+
+                if (timedOut)
+                {
+                    currentTurn.EndedAt = now;
+                    currentTurn.EndReason = TurnEndReason.TIMEOUT;
+                    player.IsActive = false;
+                    player.TurnsPlayedThisRound += 1;
                 }
                 else
                 {
-                    ResetPlayers(game.Players);
-                    int startSeat = winner?.Seat ?? 1;
-                    Round nextRound = new()
-                    {
-                        GameId = game.Id,
-                        Index = await _db.Rounds.CountAsync(r => r.GameId == game.Id, ct),
-                        StartedAt = now
-                    };
-
-                    _db.Rounds.Add(nextRound);
-                    game.CurrentRound = nextRound;
-
-                    Player? firstPlayer = FindNextValidPlayer(game.Players, startSeat - 1)
-                        ?? throw new Exception("No valid player to start round");
-
-                    currentTurnState = await CreateTurnAsync(game, nextRound, firstPlayer, now, ct);
+                    return null;
                 }
-            }
 
-            if (!roundEnded)
-            {
-                Player? nextPlayer = FindNextValidPlayer(game.Players, game.CurSeat)
-                    ?? throw new Exception("No valid player to start turn");
-                currentTurnState = await CreateTurnAsync(game, game.CurrentRound!, nextPlayer, now, ct);
-            }
+                bool roundEnded = game.Players.Count(p => p.IsTaken && p.IsActive) <= 1;
+                bool matchEnded = false;
 
-            if (currentTurnState is null)
-            {
-                currentTurnState = BuildTurnState(currentTurn);
-            }
+                TurnState? currentTurnState = null;
 
-            await _db.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
+                if (roundEnded)
+                {
+                    Round round = game.CurrentRound;
+                    Player? winner = game.Players.FirstOrDefault(p => p.IsActive && p.IsTaken);
+                    game.LastWord = null;
+                    round.EndedAt = now;
+                    round.WinnerId = winner?.Id;
+                    if (winner is not null)
+                    {
+                        winner.RoundWins += 1;
+                        matchEnded = winner.RoundWins >= game.TargetWins || game.Players.Count(p => p.IsTaken) <= 1;
+                    }
 
-            List<PlayerState> players = [.. game.Players
-                .Where(p => p.IsTaken)
-                .Select(State.PlayerToState)];
-            RoundState roundState = State.RoundToState(game.CurrentRound!);
-            GameState state = State.GameToState(game, players, roundState, currentTurnState);
+                    if (matchEnded)
+                    {
+                        game.Status = GameStatus.FINISHED;
+                    }
+                    else
+                    {
+                        ResetPlayers(game.Players);
+                        int startSeat = winner?.Seat ?? 1;
+                        Round nextRound = new()
+                        {
+                            GameId = game.Id,
+                            Index = await _db.Rounds.CountAsync(r => r.GameId == game.Id, ct),
+                            StartedAt = now
+                        };
 
-            return state;
+                        _db.Rounds.Add(nextRound);
+                        game.CurrentRound = nextRound;
+
+                        Player? firstPlayer = FindNextValidPlayer(game.Players, startSeat - 1)
+                            ?? throw new Exception("No valid player to start round");
+
+                        currentTurnState = await CreateTurnAsync(game, nextRound, firstPlayer, now, ct);
+                    }
+                }
+
+                if (!roundEnded)
+                {
+                    Player? nextPlayer = FindNextValidPlayer(game.Players, game.CurSeat)
+                        ?? throw new Exception("No valid player to start turn");
+                    currentTurnState = await CreateTurnAsync(game, game.CurrentRound!, nextPlayer, now, ct);
+                }
+
+                if (currentTurnState is null)
+                {
+                    currentTurnState = BuildTurnState(currentTurn);
+                }
+
+                await _db.SaveChangesAsync(ct);
+                await tx.CommitAsync(ct);
+
+                List<PlayerState> players = [.. game.Players
+                    .Where(p => p.IsTaken)
+                    .Select(State.PlayerToState)];
+                RoundState roundState = State.RoundToState(game.CurrentRound!);
+                GameState state = State.GameToState(game, players, roundState, currentTurnState);
+
+                return state;
+            });
         }
 
         public async Task ForceEndGame(Guid gameId, CancellationToken ct)

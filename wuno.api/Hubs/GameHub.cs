@@ -137,7 +137,13 @@ namespace Wuno.Api.Hubs
                 return;
             }
             _turnTimer.Cancel(turnId);
-            _turnTimer.Schedule(gameId, outcome.State!.CurrentTurn.TurnId, EnsureUtc(outcome.State.CurrentTurn.DueAt), BroadcastAfterTimeout);
+            
+            // Only schedule next turn timer if the game is still active
+            if (outcome.State!.Status != wuno.domain.GameStatus.FINISHED)
+            {
+                _turnTimer.Schedule(gameId, outcome.State.CurrentTurn.TurnId, EnsureUtc(outcome.State.CurrentTurn.DueAt), BroadcastAfterTimeout);
+            }
+            
             if (outcome.CompletedTurn is not null)
             {
                 await _hub.Clients.Group($"game:{gameId}").SendAsync("WordHistoryAppended", outcome.CompletedTurn, ct);
