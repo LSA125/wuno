@@ -46,9 +46,9 @@ jobs:
     - name: Azure Login
       uses: azure/login@v2
       with:
-        client-id: ${{ vars.WunoApi20251219105819_CLIENT_ID_338C }}
-        tenant-id: ${{ vars.WunoApi20251219105819_TENANT_ID_8F67 }}
-        subscription-id: ${{ vars.WunoApi20251219105819_SUBSCRIPTION_ID_8F67 }}
+        client-id: ${{ vars.WunoApi20251219105819_CLIENT_ID_653C }}
+        tenant-id: ${{ vars.WunoApi20251219105819_TENANT_ID_653C }}
+        subscription-id: ${{ vars.WunoApi20251219105819_SUBSCRIPTION_ID_653C }}
     - name: Deploy to Azure WebApp
       uses: azure/webapps-deploy@v2
       with:
