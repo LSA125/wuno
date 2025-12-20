@@ -68,19 +68,22 @@ public sealed class TurnTimerTests
     public async Task Scheduling_same_turn_replaces_existing_timer()
     {
         var serviceCollection = new ServiceCollection();
-        serviceCollection.AddSingleton<IGameService>(new StubGameService((_, _) => Task.FromResult<GameState?>(null)));
+        // Return a non-null GameState so the broadcast callback is actually invoked
+        serviceCollection.AddSingleton<IGameService>(new StubGameService((g, _) => Task.FromResult<GameState?>(
+            new GameState(g, GameStatus.ACTIVE, 1, 1, 1, null, new(), new(Guid.NewGuid(), 0, null, DateTime.UtcNow, null), new(Guid.NewGuid(), 0, 1, DateTime.UtcNow, DateTime.UtcNow.AddSeconds(10), 1, 0)))));
         var provider = serviceCollection.BuildServiceProvider();
         var timer = new TurnTimer(provider.GetRequiredService<IServiceScopeFactory>());
         var turnId = Guid.NewGuid();
-        var tasks = Enumerable.Range(0, 5).Select(_ => Task.Run(() =>
-            timer.Schedule(Guid.NewGuid(), turnId, DateTime.UtcNow.AddMinutes(1), _ => Task.CompletedTask)));
         int callbacks = 0;
+
+        // Schedule a timer far in the future - this should be replaced
         Assert.True(timer.Schedule(Guid.NewGuid(), turnId, DateTime.UtcNow.AddMinutes(1), _ =>
         {
             Interlocked.Increment(ref callbacks);
             return Task.CompletedTask;
         }));
 
+        // Replace with one that fires soon - only this one should call back
         Assert.True(timer.Schedule(Guid.NewGuid(), turnId, DateTime.UtcNow.AddMilliseconds(30), _ =>
         {
             Interlocked.Increment(ref callbacks);

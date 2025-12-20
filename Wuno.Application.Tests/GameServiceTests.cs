@@ -268,4 +268,153 @@ public sealed class GameServiceTests
         public StubCodeGenerator(string code) => _code = code;
         public string GenerateCode() => _code;
     }
+
+    [Fact]
+    public async Task JoinGameAsync_allows_joining_active_games()
+    {
+        var factory = new SqliteInMemoryAppDbContextFactory();
+        var game = new GameBuilder()
+            .WithStatus(GameStatus.ACTIVE)  // Game already started
+            .AddPlayer(new PlayerBuilder().AtSeat(1).Taken(true).Active(true).Connected(true))
+            .AddPlayer(new PlayerBuilder().AtSeat(2).Taken(false).Active(false).Connected(false))  // Open slot
+            .Build();
+        var user = new User { Name = "LateJoiner" };
+
+        using var db = factory.CreateContext(ctx => ctx.AddRange(game, user));
+        var service = CreateService(db);
+
+        var response = await service.JoinGameAsync(game.Id, user.Id, CancellationToken.None);
+
+        Assert.NotEqual(Guid.Empty, response.PlayerId);
+        var refreshedUser = await db.Users.Include(u => u.ActivePlayer).FirstAsync(u => u.Id == user.Id);
+        Assert.NotNull(refreshedUser.ActivePlayer);
+        Assert.True(refreshedUser.ActivePlayer!.IsTaken);
+        Assert.Equal(2, refreshedUser.ActivePlayer.Seat);  // Should take seat 2
+    }
+
+    [Fact]
+    public async Task JoinGameAsync_rejects_finished_games()
+    {
+        var factory = new SqliteInMemoryAppDbContextFactory();
+        var game = new GameBuilder()
+            .WithStatus(GameStatus.FINISHED)
+            .AddPlayer(new PlayerBuilder().AtSeat(1).Taken(false).Active(false).Connected(false))
+            .Build();
+        var user = new User { Name = "TooLate" };
+
+        using var db = factory.CreateContext(ctx => ctx.AddRange(game, user));
+        var service = CreateService(db);
+
+        var ex = await Assert.ThrowsAsync<Exception>(() =>
+            service.JoinGameAsync(game.Id, user.Id, CancellationToken.None));
+        Assert.Equal("Game not joinable", ex.Message);
+    }
+
+    [Fact]
+    public async Task JoinGameAsync_reconnects_player_already_in_game()
+    {
+        var factory = new SqliteInMemoryAppDbContextFactory();
+        var playerBuilder = new PlayerBuilder().AtSeat(1).Taken(true).Active(true).Connected(false);
+        var game = new GameBuilder()
+            .WithStatus(GameStatus.ACTIVE)
+            .AddPlayer(playerBuilder)
+            .AddPlayer(new PlayerBuilder().AtSeat(2).Taken(true).Active(true).Connected(true))
+            .Build();
+        var player = game.Players.First(p => p.Seat == 1);
+        var user = new User { Name = "Reconnector", ActivePlayer = player };
+        player.User = user;
+
+        using var db = factory.CreateContext(ctx => ctx.AddRange(game, user));
+        var service = CreateService(db);
+
+        var response = await service.JoinGameAsync(game.Id, user.Id, CancellationToken.None);
+
+        Assert.Equal(player.Id, response.PlayerId);
+        var refreshedPlayer = await db.Players.FindAsync(player.Id);
+        Assert.True(refreshedPlayer!.IsConnected);  // Should now be connected
+    }
+
+    [Fact]
+    public async Task FindOrCreatePublicGameAsync_finds_existing_waiting_game()
+    {
+        var factory = new SqliteInMemoryAppDbContextFactory();
+        var existingGame = new GameBuilder()
+            .WithCode("PUBLIC")
+            .WithStatus(GameStatus.WAITING)
+            .IsPublic(true)
+            .AddPlayer(new PlayerBuilder().AtSeat(1).Taken(true).Active(false).Connected(true))
+            .AddPlayer(new PlayerBuilder().AtSeat(2).Taken(false).Active(false).Connected(false))  // Open slot
+            .Build();
+
+        using var db = factory.CreateContext(ctx => ctx.Add(existingGame));
+        var service = CreateService(db);
+
+        var result = await service.FindOrCreatePublicGameAsync(CancellationToken.None);
+
+        Assert.True(result.Ok);
+        Assert.Equal("PUBLIC", result.GameCode);
+        Assert.False(result.WasCreated);  // Should find existing, not create new
+    }
+
+    [Fact]
+    public async Task FindOrCreatePublicGameAsync_finds_existing_active_game()
+    {
+        var factory = new SqliteInMemoryAppDbContextFactory();
+        var existingGame = new GameBuilder()
+            .WithCode("ACTIVE1")
+            .WithStatus(GameStatus.ACTIVE)  // Already started but has room
+            .IsPublic(true)
+            .AddPlayer(new PlayerBuilder().AtSeat(1).Taken(true).Active(true).Connected(true))
+            .AddPlayer(new PlayerBuilder().AtSeat(2).Taken(false).Active(false).Connected(false))  // Open slot
+            .Build();
+
+        using var db = factory.CreateContext(ctx => ctx.Add(existingGame));
+        var service = CreateService(db);
+
+        var result = await service.FindOrCreatePublicGameAsync(CancellationToken.None);
+
+        Assert.True(result.Ok);
+        Assert.Equal("ACTIVE1", result.GameCode);
+        Assert.False(result.WasCreated);  // Should find existing active game
+    }
+
+    [Fact]
+    public async Task FindOrCreatePublicGameAsync_creates_new_game_when_none_available()
+    {
+        var factory = new SqliteInMemoryAppDbContextFactory();
+        // No existing games
+        using var db = factory.CreateContext();
+        var service = CreateService(db);
+
+        var result = await service.FindOrCreatePublicGameAsync(CancellationToken.None);
+
+        Assert.True(result.Ok);
+        Assert.Equal("TEST01", result.GameCode);  // From StubCodeGenerator
+        Assert.True(result.WasCreated);  // Should create new
+
+        var savedGame = await db.Games.SingleAsync();
+        Assert.True(savedGame.IsPublic);
+        Assert.Equal(GameStatus.WAITING, savedGame.Status);
+    }
+
+    [Fact]
+    public async Task FindOrCreatePublicGameAsync_ignores_finished_games()
+    {
+        var factory = new SqliteInMemoryAppDbContextFactory();
+        var finishedGame = new GameBuilder()
+            .WithCode("DONE01")
+            .WithStatus(GameStatus.FINISHED)  // Finished, should be ignored
+            .IsPublic(true)
+            .AddPlayer(new PlayerBuilder().AtSeat(1).Taken(false).Active(false).Connected(false))  // Open slot but game is done
+            .Build();
+
+        using var db = factory.CreateContext(ctx => ctx.Add(finishedGame));
+        var service = CreateService(db);
+
+        var result = await service.FindOrCreatePublicGameAsync(CancellationToken.None);
+
+        Assert.True(result.Ok);
+        Assert.Equal("TEST01", result.GameCode);  // Should create new, not find finished
+        Assert.True(result.WasCreated);
+    }
 }

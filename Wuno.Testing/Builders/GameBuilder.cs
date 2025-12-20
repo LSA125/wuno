@@ -12,6 +12,7 @@ namespace Wuno.Testing.Builders
         private int _direction = 1;
         private DateTime _createdAt = DateTime.UtcNow;
         private string? _lastWord;
+        private bool _isPublic = false;
         private readonly List<PlayerBuilder> _players = new();
         private readonly List<Round> _rounds = new();
         private readonly List<TurnBuilder> _turns = new();
@@ -24,6 +25,7 @@ namespace Wuno.Testing.Builders
         public GameBuilder Direction(int direction) { _direction = direction; return this; }
         public GameBuilder Created(DateTime created) { _createdAt = created; return this; }
         public GameBuilder LastWord(string? word) { _lastWord = word; return this; }
+        public GameBuilder IsPublic(bool isPublic) { _isPublic = isPublic; return this; }
         public GameBuilder AddPlayer(PlayerBuilder player) { _players.Add(player); return this; }
         public GameBuilder AddRound(Round round) { _rounds.Add(round); return this; }
         public GameBuilder AddRound(RoundBuilder round) { _rounds.Add(round.Build()); return this; }
@@ -41,6 +43,7 @@ namespace Wuno.Testing.Builders
                 Direction = _direction,
                 CreatedAt = _createdAt,
                 LastWord = _lastWord,
+                IsPublic = _isPublic,
             };
 
             foreach (var round in _rounds)
