@@ -1,5 +1,5 @@
 import type { PlayerState } from "@/api/types";
-import DefaultAvatar from "@/assets/avatar.svg";
+import DefaultAvatar from "@/assets/DefaultAvatar.svg";
 type PlayerTypingRowProps = {
     player: PlayerState;
     typed: string;
