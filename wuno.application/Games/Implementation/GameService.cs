@@ -486,7 +486,7 @@ namespace Wuno.Application.Games.Implementation
                 GameState? gameState = await GetGameStateAsync(gameId, ct) ?? throw new Exception("Failed to get game state after joining");
                 return new JoinGameResponse(player.Id, gameState);
             }
-            else if (game.Status != GameStatus.WAITING) throw new Exception("Game not joinable");
+            else if (game.Status != GameStatus.WAITING && game.Status != GameStatus.ACTIVE) throw new Exception("Game not joinable");
             Player? inactive = game.Players.FirstOrDefault(p => !p.IsConnected && !p.IsTaken);
             if (inactive is null) throw new Exception("Game full");
             inactive.IsActive = false;
@@ -667,7 +667,7 @@ namespace Wuno.Application.Games.Implementation
             // Find a public game with open slots
             var publicGame = await _db.Games
                 .Include(g => g.Players)
-                .Where(g => g.IsPublic)
+                .Where(g => g.IsPublic && (g.Status == GameStatus.WAITING || g.Status == GameStatus.ACTIVE))
                 .Where(g => g.Players.Any(p => !p.IsTaken))
                 .OrderBy(g => g.CreatedAt)
                 .FirstOrDefaultAsync(ct);
