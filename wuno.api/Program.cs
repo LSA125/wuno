@@ -11,6 +11,7 @@ using Wuno.Api.Middleware;
 using Wuno.Application.Games.Implementation;
 using Wuno.Application.Games.Inheritance;
 using Wuno.Application.Users;
+using Microsoft.Azure.SignalR;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -95,6 +96,7 @@ builder.Logging.AddConsole();
 builder.Services.AddDataProtection()
   .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(builder.Environment.ContentRootPath, "keys")))
   .SetApplicationName("WunoApp");
+builder.Services.AddSignalR().AddAzureSignalR(builder.Configuration["Azure:SignalR:ConnectionString"]!);
 
 
 var app = builder.Build();
