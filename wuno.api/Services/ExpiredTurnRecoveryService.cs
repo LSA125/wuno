@@ -18,7 +18,6 @@ namespace Wuno.Api.Services
         private readonly ILogger<ExpiredTurnRecoveryService> _logger;
         private readonly IHubContext<Hubs.GameHub> _hubContext;
         private readonly ITurnTimer _turnTimer;
-        private readonly TimeSpan _checkInterval = TimeSpan.FromSeconds(10);  // Check every 10 seconds
         private readonly TimeSpan _graceBuffer = TimeSpan.FromSeconds(2);  // Buffer before considering a turn expired
 
         public ExpiredTurnRecoveryService(
@@ -38,21 +37,19 @@ namespace Wuno.Api.Services
             // Wait a bit for app startup
             await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             
-            _logger.LogInformation("ExpiredTurnRecoveryService started");
+            _logger.LogInformation("ExpiredTurnRecoveryService running one-time startup recovery");
 
-            while (!stoppingToken.IsCancellationRequested)
+            try
             {
-                try
-                {
-                    await RecoverExpiredTurnsAsync(stoppingToken);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error during expired turn recovery");
-                }
-
-                await Task.Delay(_checkInterval, stoppingToken);
+                await RecoverExpiredTurnsAsync(stoppingToken);
+                _logger.LogInformation("ExpiredTurnRecoveryService completed startup recovery");
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during expired turn recovery");
+            }
+            
+            // Service completes after one-time recovery - the in-memory TurnTimer handles ongoing expirations
         }
 
         private async Task RecoverExpiredTurnsAsync(CancellationToken ct)
