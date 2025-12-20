@@ -1,9 +1,10 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using wuno.domain;
 namespace wuno.infrastructure
 {
-    public sealed class AppDbContext : DbContext
+    public sealed class AppDbContext : DbContext, IDataProtectionKeyContext
     {
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
@@ -13,6 +14,9 @@ namespace wuno.infrastructure
         public DbSet<Turn> Turns => Set<Turn>();
         public DbSet<User> Users => Set<User>();
         public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
+        
+        // Data Protection keys - persisted to DB for Azure compatibility
+        public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
         protected override void OnModelCreating(ModelBuilder b)
         {

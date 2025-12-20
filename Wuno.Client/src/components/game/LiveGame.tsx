@@ -46,6 +46,20 @@ export default function LiveGame({
     const [seenWords, setSeenWords] = useState<Set<string>>(new Set());
     const lastMatchRef = useRef(0);
     const prevTurnIdRef = useRef<string | null>(null);
+    const mobileInputRef = useRef<HTMLInputElement>(null);
+    const [isMobile, setIsMobile] = useState(false);
+
+    // Detect mobile device
+    useEffect(() => {
+        const checkMobile = () => {
+            const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+            const isMobileWidth = window.innerWidth < 768;
+            setIsMobile(isTouchDevice || isMobileWidth);
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     const dictionary = useMemo(
         () => new Set(wordListText.split(/\r?\n/).map(normalizeWord).filter(Boolean)),
@@ -111,12 +125,21 @@ export default function LiveGame({
         if (myTurn && isNewTurn) {
             playTurnStartSound();
             startTickingSound();
+            // Auto-focus mobile input to trigger keyboard
+            if (isMobile && mobileInputRef.current) {
+                // Small delay to ensure the UI has rendered
+                setTimeout(() => mobileInputRef.current?.focus(), 100);
+            }
         } else if (!myTurn) {
             stopTickingSound();
+            // Blur mobile input when not our turn
+            if (mobileInputRef.current) {
+                mobileInputRef.current.blur();
+            }
         }
         
         return () => stopTickingSound();
-    }, [turn?.turnId, myTurn, ended]);
+    }, [turn?.turnId, myTurn, ended, isMobile]);
 
     // Play match sound when reverse match length changes
     useEffect(() => {
@@ -177,13 +200,44 @@ export default function LiveGame({
         onType(meSeat, input);
     }, [input, meSeat, myTurn, onType]);
 
+    // Handle input change from mobile text field
+    const handleMobileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!myTurn || ended) return;
+        
+        const newValue = e.target.value.toLowerCase().replace(/[^a-z]/g, '');
+        
+        // Block wrong first letter
+        if (newValue.length === 1 && requiredStart) {
+            const requiredLower = normalizeWord(requiredStart).toLowerCase();
+            if (newValue !== requiredLower) {
+                playErrorSound();
+                setShake(true);
+                setTimeout(() => setShake(false), 350);
+                e.target.value = '';  // Clear invalid first letter
+                return;
+            }
+        }
+        
+        setInput(newValue);
+    }, [myTurn, ended, requiredStart]);
+
+    // Handle Enter key on mobile input
+    const handleMobileKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            attemptSubmit();
+        }
+    }, [attemptSubmit]);
+
+    // Desktop keyboard listener (only active when mobile input not focused)
     useEffect(() => {
         if (!myTurn || ended) return;
 
         const handleKeyDown = (event: KeyboardEvent) => {
             const target = event.target as HTMLElement;
+            // Allow our mobile input, block other inputs
             if (
-                target?.tagName.toLowerCase() === "input" ||
+                (target?.tagName.toLowerCase() === "input" && target !== mobileInputRef.current) ||
                 target?.tagName.toLowerCase() === "textarea" ||
                 target?.isContentEditable
             ) {
@@ -223,7 +277,8 @@ export default function LiveGame({
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [attemptSubmit, ended, myTurn]);
+    }, [attemptSubmit, ended, myTurn, input, requiredStart]);
+
 
     if (!turn) {
         return (
@@ -352,12 +407,42 @@ export default function LiveGame({
                         ) : (
                             <span className="text-muted">
                                 {myTurn
-                                    ? "Type letters anywhere on the page."
+                                    ? (isMobile ? "Tap below to type" : "Type letters anywhere on the page")
                                     : `${turnContext?.playerName ?? "Another player"} is typing`}
                             </span>
                         )}
                         <RecentWordHistory history={wordHistory} fallbackPrevious={previousWord || ""} players={players} />
                     </RestrictionTrack>
+
+                    {/* Mobile input - visible on mobile during user's turn */}
+                    {myTurn && (
+                        <div className="mobile-input-container d-flex gap-2">
+                            <input
+                                ref={mobileInputRef}
+                                type="text"
+                                className="form-control mobile-word-input"
+                                placeholder={requiredStart ? `Type a word starting with "${requiredStart.toUpperCase()}"` : "Type your word..."}
+                                value={input}
+                                onChange={handleMobileInput}
+                                onKeyDown={handleMobileKeyDown}
+                                autoComplete="off"
+                                autoCapitalize="off"
+                                autoCorrect="off"
+                                spellCheck={false}
+                                enterKeyHint="send"
+                                disabled={!myTurn || ended}
+                                aria-label="Word input"
+                            />
+                            <button 
+                                type="button" 
+                                className="btn btn-primary submit-word-btn"
+                                onClick={attemptSubmit}
+                                disabled={!canSubmit}
+                            >
+                                Submit
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
             <PlayerSidebar players={players} currentSeat={turn.seat} meSeat={meSeat} turnDueAt={turn.dueAt} turnContext={turnContext ?? undefined} />

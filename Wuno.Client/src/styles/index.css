@@ -938,3 +938,56 @@ body {
     color: #8a2be2;
 }
 
+/* Mobile word input */
+.mobile-input-container {
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(13, 110, 253, 0.3);
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.mobile-word-input {
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: lowercase;
+    border-radius: 8px;
+    border: 2px solid rgba(13, 110, 253, 0.2);
+    background: rgba(255, 255, 255, 0.9);
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.mobile-word-input:focus {
+    border-color: rgba(13, 110, 253, 0.5);
+    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+    outline: none;
+}
+
+.mobile-word-input::placeholder {
+    color: rgba(0, 0, 0, 0.4);
+    font-weight: 400;
+}
+
+.submit-word-btn {
+    font-weight: 600;
+    padding: 8px 20px;
+    border-radius: 8px;
+    white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+    .mobile-input-container {
+        flex-direction: column;
+    }
+    
+    .mobile-word-input {
+        font-size: 1.2rem;
+        padding: 12px;
+    }
+    
+    .submit-word-btn {
+        width: 100%;
+        padding: 12px;
+    }
+}

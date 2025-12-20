@@ -101,12 +101,19 @@ builder.Services.AddSignalR();
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Services.AddDataProtection()
-  .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(builder.Environment.ContentRootPath, "keys")))
+  .PersistKeysToDbContext<AppDbContext>()  // Store keys in database for Azure persistence
   .SetApplicationName("WunoApp");
 builder.Services.AddSignalR().AddAzureSignalR(builder.Configuration["Azure:SignalR:ConnectionString"]!);
 
 
 var app = builder.Build();
+
+// Apply pending migrations on startup (ensures DataProtectionKeys table exists)
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
