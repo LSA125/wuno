@@ -1,5 +1,9 @@
 # Wuno
 
+🎮 **Play Now:** [https://w-uno.xyz](https://w-uno.xyz)
+
+> ⚠️ **Note:** The app is hosted on Azure free tier. Initial load may take 30-60 seconds while the services wake up from cold start.
+
 Wuno is a fast, real-time party word game you can spin up and play with friends.  
 The back end is built with ASP.NET Core, SignalR, and EF Core.  
 The front end is a React SPA developed using Vite and Tailwind CSS.  
@@ -26,14 +30,16 @@ The app focuses on quick joins (guest mode), deterministic gameplay logic, robus
 
 ## Features
 
-- Play instantly as a Guest or register for an account.  
-- Create and join games via short room codes.  
-- Lobby system with ready states; the match begins when all players are ready.  
-- Real-time gameplay powered by SignalR with synchronized turns, timers, and state updates.  
-- Deterministic word and effects logic for fairness and consistency.  
-- Auto-rejoin support to recover from disconnections.  
-- Server-side timeouts and turn advancement.  
-- Rate limiting, CORS policies, and secure cookie authentication.  
+- **Play instantly** as a Guest or register for an account  
+- **Quick matchmaking** - find a game automatically or create private rooms with codes  
+- **Real-time gameplay** powered by SignalR with synchronized turns, timers, and state updates  
+- **Mobile-friendly** - responsive design with touch-optimized controls  
+- **Word chain scoring** - match letters from previous words for bonus points and time  
+- **Lobby system** with ready states; the match begins when all players are ready  
+- **Auto-rejoin** support to recover from disconnections  
+- **Server-side turn timers** that advance the game even if players disconnect  
+- **Crash recovery** if the server crashes, the game will resume seamlessly.
+- **Rate limiting**, CORS policies, and secure cookie authentication
 
 ---
 
@@ -53,11 +59,12 @@ Each image shows different parts of the game flow, from landing to gameplay setu
 
 ```
 wuno/
-├─ Wuno.Api            # ASP.NET Core API + SignalR Hub + Middleware
-├─ Wuno.Application    # Application layer (services, orchestrations)
-├─ Wuno.Domain         # Entities, enums, and rules (pure domain)
-├─ Wuno.Infrastructure # EF Core DbContext, migrations, timers, adapters
-└─ wuno.client         # React/Vite SPA (TypeScript + Tailwind)
+├─ wuno.api            # ASP.NET Core API + SignalR Hub + Middleware
+├─ wuno.application    # Application layer (services, orchestrations)
+├─ wuno.domain         # Entities, enums, and rules (pure domain)
+├─ wuno.infrastructure # EF Core DbContext, migrations, background jobs
+├─ Wuno.Client         # React/Vite SPA (TypeScript + Tailwind + Bootstrap)
+└─ *.Tests             # Unit test projects
 ```
 
 ### Core Flows
@@ -73,8 +80,8 @@ wuno/
 ## Tech Stack
 
 **Backend:** ASP.NET Core 8, SignalR, EF Core (SQL Server), ASP.NET Rate Limiting, Data Protection, Swagger  
-**Frontend:** React 18, Vite, TypeScript, Tailwind CSS  
-**Infrastructure:** Local SQL Server or containerized database, HTTPS via .NET developer certificates  
+**Frontend:** React 18, Vite, TypeScript, Tailwind CSS, Bootstrap  
+**Production:** Azure App Service, Azure SQL Database, Azure SignalR Service, Azure Static Web Apps
 
 ---
 
@@ -135,10 +142,11 @@ The frontend runs at `https://localhost:5173` and proxies requests to the backen
 
 ## Notable Code
 
-- `Wuno.Api/Hubs/GameHub.cs` – SignalR orchestration and real-time messaging.  
-- `Wuno.Application/Games/GameService.cs` – Core transactional game logic and deterministic rules.  
-- `Wuno.Infrastructure/AppDbContext.cs` – EF Core context and persistence layer.  
-- `wuno.client/src/pages/GamePage.tsx` – Game UI and SignalR integration on the client side.  
+- `wuno.api/Hubs/GameHub.cs` – SignalR orchestration and real-time messaging  
+- `wuno.application/Games/Implementation/GameService.cs` – Core game logic and turn processing  
+- `wuno.domain/Rules/Effects.cs` – Deterministic scoring and turn time calculations  
+- `wuno.infrastructure/AppDbContext.cs` – EF Core context with Data Protection key storage  
+- `Wuno.Client/src/components/game/LiveGame.tsx` – Game UI with mobile input support
 
 ---
 
@@ -154,11 +162,16 @@ The frontend runs at `https://localhost:5173` and proxies requests to the backen
 
 ## Roadmap
 
-- Add spectator and replay features.  
-- Cloud deployment (Azure App Service + SQL).  
-- Matchmaking and friend lists.
-- AI/bot/single player support.
-- Accessibility and mobile layout enhancements.
+**Completed:**
+- ✅ Cloud deployment (Azure App Service + Azure SQL + Azure SignalR)
+- ✅ Quick matchmaking system
+- ✅ Mobile-responsive gameplay
+
+**Planned:**
+- Spectator and replay features
+- Friend lists and invites
+- AI/bot opponents for single player practice
+- Leaderboards and statistics tracking
 
 ---
 
