@@ -47,7 +47,16 @@ namespace Wuno.Application.Games.Implementation
                 GameState? state = await svc.TimeoutAndAdvanceAsync(gameId, turnId, CancellationToken.None);
                 if (state is not null)
                 {
-                    await Broadcast(state);
+                    try
+                    {
+                        await Broadcast(state);
+                    }
+                    catch (InvalidCastException ex)
+                    {
+                        // Known issue with Azure SignalR reflection internals
+                        // Log and continue - the state update was saved, just notification failed
+                        System.Diagnostics.Debug.WriteLine($"Broadcast failed (InvalidCastException): {ex.Message}");
+                    }
                 }
             }
             catch (TaskCanceledException) { }

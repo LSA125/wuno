@@ -98,19 +98,22 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
   });
 
 builder.Services.AddAuthorization();
-builder.Services.AddSignalR();
-builder.Logging.ClearProviders();
-builder.Logging.AddConsole();
-builder.Services.AddDataProtection()
-  .PersistKeysToDbContext<AppDbContext>()  // Store keys in database for Azure persistence
-  .SetApplicationName("WunoApp");
-
-// Only add Azure SignalR if connection string is configured (production)
+// Configure SignalR - only add Azure SignalR if connection string is configured (production)
 var signalRConnectionString = builder.Configuration["Azure:SignalR:ConnectionString"];
 if (!string.IsNullOrEmpty(signalRConnectionString))
 {
     builder.Services.AddSignalR().AddAzureSignalR(signalRConnectionString);
 }
+else
+{
+    builder.Services.AddSignalR();
+}
+
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Services.AddDataProtection()
+  .PersistKeysToDbContext<AppDbContext>()  // Store keys in database for Azure persistence
+  .SetApplicationName("WunoApp");
 
 
 var app = builder.Build();
