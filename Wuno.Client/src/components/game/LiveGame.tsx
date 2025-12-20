@@ -7,7 +7,7 @@ import RecentWordHistory from "./pieces/RecentWordHistory";
 import { computeReverseMatchLength, normalizeWord, reverseString } from "@/utils/wordMatching";
 import TurnTimer from "./pieces/TurnTimer";
 import wordListText from "@/assets/words.txt?raw";
-import { playErrorSound, playSuccessSound, playTurnStartSound, startTickingSound, stopTickingSound, playMatchSound } from "@/utils/sounds";
+import { playErrorSound, playSuccessSound, playTurnStartSound, startTickingSound, stopTickingSound, playMatchSound, playExplosionSound } from "@/utils/sounds";
 import { getLetterValue } from "@/utils/letterScoring";
 import { TIME_BONUS_MULTIPLIER, SCORE_DIVISOR } from "@/constants";
 
@@ -46,6 +46,7 @@ export default function LiveGame({
     const [seenWords, setSeenWords] = useState<Set<string>>(new Set());
     const lastMatchRef = useRef(0);
     const prevTurnIdRef = useRef<string | null>(null);
+    const pendingSubmitRef = useRef(false);  // Track if we just submitted
     const mobileInputRef = useRef<HTMLInputElement>(null);
     const [isMobile, setIsMobile] = useState(false);
 
@@ -80,6 +81,9 @@ export default function LiveGame({
 
     useEffect(() => {
         if (!submitError) return;
+        // Server rejected our word - play error sound and clear pending state
+        pendingSubmitRef.current = false;
+        playErrorSound();
         setInvalidReason(submitError.reason);
         setShake(true);
         const id = window.setTimeout(() => setShake(false), 350);
@@ -147,6 +151,26 @@ export default function LiveGame({
         playMatchSound(reverseMatchLength);
         lastMatchRef.current = reverseMatchLength;
     }, [reverseMatchLength, turn]);
+
+    // Track previous turn owner for timeout detection
+    const wasMyTurnRef = useRef(false);
+
+    // Play success/error sound when turn advances away from us
+    useEffect(() => {
+        // Check if turn moved away from us (was ours, now isn't)
+        if (wasMyTurnRef.current && !myTurn && turn) {
+            if (pendingSubmitRef.current) {
+                // We submitted and it was accepted
+                playSuccessSound();
+            } else {
+                // We didn't submit in time (timeout) - bomb explodes!
+                playExplosionSound();
+            }
+            pendingSubmitRef.current = false;
+        }
+        // Update ref AFTER checking (so next render sees old value)
+        wasMyTurnRef.current = myTurn;
+    }, [turn?.turnId, myTurn]);
     const validateWord = useCallback(
         (word: string): string | null => {
             const trimmed = word.trim();
@@ -187,7 +211,8 @@ export default function LiveGame({
         }
         const trimmed = input.trim();
         if (!trimmed) return;
-        playSuccessSound();
+        // Mark that we're waiting for server confirmation
+        pendingSubmitRef.current = true;
         onSubmit(trimmed);
         setInput("");
         setInvalidReason(null);
@@ -354,7 +379,7 @@ export default function LiveGame({
                             })}
                         </div>
                     </div>
-                    <button type="button" className="btn btn-lg btn-primary px-4" onClick={onLeave}>
+                    <button type="button" className="btn btn-lg btn-primary px-4" onClick={() => window.location.href = "/lobby"}>
                         Back to lobby
                     </button>
                 </div>

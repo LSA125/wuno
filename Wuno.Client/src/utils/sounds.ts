@@ -39,6 +39,52 @@ export function playErrorSound() {
     }
 }
 
+// Explosion sound - bomb timeout (low rumble with decay)
+export function playExplosionSound() {
+    try {
+        const ctx = getAudioContext();
+        
+        // White noise for explosion texture
+        const bufferSize = ctx.sampleRate * 0.5; // 0.5 seconds
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+        }
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+        
+        // Low frequency rumble
+        const oscillator = ctx.createOscillator();
+        oscillator.type = "sine";
+        oscillator.frequency.value = 60; // Low rumble
+        
+        // Gain envelope for explosion decay
+        const noiseGain = ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.15, ctx.currentTime);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+        
+        const oscGain = ctx.createGain();
+        oscGain.gain.setValueAtTime(0.2, ctx.currentTime);
+        oscGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+        
+        // Low-pass filter on noise for more "boom" less "hiss"
+        const filter = ctx.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.value = 400;
+        
+        noise.connect(filter).connect(noiseGain).connect(ctx.destination);
+        oscillator.connect(oscGain).connect(ctx.destination);
+        
+        noise.start();
+        oscillator.start();
+        noise.stop(ctx.currentTime + 0.5);
+        oscillator.stop(ctx.currentTime + 0.5);
+    } catch (e) {
+        console.warn("Audio error:", e);
+    }
+}
+
 // Success sound - pleasant chime
 export function playSuccessSound() {
     try {

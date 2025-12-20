@@ -604,10 +604,16 @@ body {
     .game-layout {
         grid-template-columns: 1fr;
         grid-template-rows: auto auto;
+        min-height: 100dvh;
+        max-height: 100dvh;
+        overflow: hidden;
     }
 
     .game-layout > .game-panel {
         order: 1;
+        max-height: calc(100dvh - 160px);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     .game-layout > .player-roster-card {
