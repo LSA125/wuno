@@ -478,4 +478,67 @@ public sealed class GameServiceTests
         Assert.Equal("TEST01", result.GameCode);  // Should create new, not find finished
         Assert.True(result.WasCreated);
     }
+
+    [Fact]
+    public async Task LeaveGameAsync_returns_correct_result_and_ends_game_when_one_player_left()
+    {
+        var factory = new SqliteInMemoryAppDbContextFactory();
+        var player1 = new PlayerBuilder().AtSeat(1).Taken(true).Active(true).Connected(true);
+        var player2 = new PlayerBuilder().AtSeat(2).Taken(true).Active(true).Connected(true);
+        var game = new GameBuilder()
+            .WithStatus(GameStatus.ACTIVE)
+            .AddPlayer(player1)
+            .AddPlayer(player2)
+            .Build();
+        var user1 = new User { Name = "Player1", ActivePlayer = game.Players.First(p => p.Seat == 1) };
+        game.Players.First(p => p.Seat == 1).User = user1;
+
+        using var db = factory.CreateContext(ctx => ctx.AddRange(game, user1));
+        var timer = new FakeTurnTimer();
+        var service = CreateService(db, timer);
+        var playerId = user1.ActivePlayer!.Id;  // Capture before LeaveGameAsync sets it to null
+
+        // Player 1 leaves - only player 2 remains, so game should end
+        var result = await service.LeaveGameAsync(user1.Id, CancellationToken.None);
+
+        Assert.Equal(game.Id, result.GameId);
+        Assert.True(result.GameEnded);  // Only 1 player left = game should end
+        Assert.NotNull(result.FinalState);
+        Assert.Equal(GameStatus.FINISHED, result.FinalState!.Status);
+        Assert.Null(result.RemainingPlayers);  // Not returned when game ended
+        
+        // Verify player slot was reset
+        var refreshedPlayer = await db.Players.FindAsync(playerId);
+        Assert.False(refreshedPlayer!.IsTaken);
+        Assert.False(refreshedPlayer.IsConnected);
+    }
+
+    [Fact]
+    public async Task LeaveGameAsync_returns_remaining_players_when_game_continues()
+    {
+        var factory = new SqliteInMemoryAppDbContextFactory();
+        var player1 = new PlayerBuilder().AtSeat(1).Taken(true).Active(true).Connected(true);
+        var player2 = new PlayerBuilder().AtSeat(2).Taken(true).Active(true).Connected(true);
+        var player3 = new PlayerBuilder().AtSeat(3).Taken(true).Active(true).Connected(true);
+        var game = new GameBuilder()
+            .WithStatus(GameStatus.ACTIVE)
+            .AddPlayer(player1)
+            .AddPlayer(player2)
+            .AddPlayer(player3)
+            .Build();
+        var user1 = new User { Name = "Player1", ActivePlayer = game.Players.First(p => p.Seat == 1) };
+        game.Players.First(p => p.Seat == 1).User = user1;
+
+        using var db = factory.CreateContext(ctx => ctx.AddRange(game, user1));
+        var service = CreateService(db);
+
+        // Player 1 leaves - 2 players remain, game continues
+        var result = await service.LeaveGameAsync(user1.Id, CancellationToken.None);
+
+        Assert.Equal(game.Id, result.GameId);
+        Assert.False(result.GameEnded);  // 2+ players left = game continues
+        Assert.Null(result.FinalState);
+        Assert.NotNull(result.RemainingPlayers);
+        Assert.Equal(2, result.RemainingPlayers!.Count);
+    }
 }

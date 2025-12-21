@@ -75,7 +75,7 @@ public sealed class GamesControllerTests
         public Task<List<TurnHistoryState>> GetRecentWordHistoryAsync(Guid gameId, CancellationToken ct)
             => Task.FromResult(new List<TurnHistoryState>());
         public Task ReadyAsync(Guid gameId, int seat, bool isReady, CancellationToken ct) => Task.CompletedTask;
-        public Task<Guid?> LeaveGameAsync(Guid userId, CancellationToken ct) => Task.FromResult<Guid?>(null);
+        public Task<LeaveGameResult> LeaveGameAsync(Guid userId, CancellationToken ct) => Task.FromResult(new LeaveGameResult(Guid.Empty, false, new List<PlayerState>(), null));
         public Task<MatchmakingResponse> FindOrCreatePublicGameAsync(CancellationToken ct)
             => Task.FromResult(new MatchmakingResponse(true, "TEST", true));
     }

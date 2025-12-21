@@ -26,6 +26,7 @@ namespace Wuno.Application.Games.Util
     public record TurnHistoryState(Guid TurnId, int Index, int Seat, string Word, int MinLen, int Score);
     public record GameState(Guid GameId, GameStatus Status, int NextSeat, int Direction, int TargetWins, string? LastWord, List<PlayerState> Players, RoundState? CurrentRound, TurnState? CurrentTurn);
     public record ProcessTurnOutcome(bool Ok, string? Reason, GameState? State, TurnHistoryState? CompletedTurn);
+    public record LeaveGameResult(Guid GameId, bool GameEnded, List<PlayerState>? RemainingPlayers, GameState? FinalState);
     public record TopWordEntry(string Word, int Score);
     public record UserStatsResponse(
         bool Ok,

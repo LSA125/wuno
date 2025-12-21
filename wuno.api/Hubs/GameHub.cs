@@ -88,27 +88,19 @@ namespace Wuno.Api.Hubs
         {
             var ct = Context.ConnectionAborted;
             var ps = RequireSession();
-            var playerId = ps.PlayerId;
-            await _svc.LeaveGameAsync(ps.UserId, ct);
+            var result = await _svc.LeaveGameAsync(ps.UserId, ct);
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"game:{gameId}", ct);
             
-            // Check if game ended due to player leaving
-            var state = await _svc.GetGameStateAsync(gameId, ct);
-            if (state.Status == wuno.domain.GameStatus.FINISHED)
+            if (result.GameEnded)
             {
                 // Game ended - notify remaining players with MatchEnded
-                await Clients.Group($"game:{gameId}").SendAsync("MatchEnded", state, ct);
-                return;
+                await Clients.Group($"game:{gameId}").SendAsync("MatchEnded", result.FinalState, ct);
             }
-            
-            // Game continues - just update player list
-            var players = await _svc.GetPlayersAsync(gameId, ct);
-            if(players.Count == 0)
+            else
             {
-                await _svc.ForceEndGame(gameId, ct);
-                return;
+                // Game continues - just update player list
+                await Clients.Group($"game:{gameId}").SendAsync("PlayersUpdated", result.RemainingPlayers, ct);
             }
-            await Clients.Group($"game:{gameId}").SendAsync("PlayersUpdated", players, ct);
         }
         public override async Task OnDisconnectedAsync(Exception? exception)
         {

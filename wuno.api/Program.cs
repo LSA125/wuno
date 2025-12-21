@@ -43,7 +43,6 @@ builder.Services.AddSingleton<IWordList, WordList>();
 builder.Services.AddSingleton<IUserIdProvider, HubUserIdProvider>();
 builder.Services.AddSingleton<Wuno.Api.Services.ITokenService, Wuno.Api.Services.TokenService>();
 builder.Services.AddHostedService<Wuno.Api.Services.GuestCleanupService>();
-builder.Services.AddHostedService<Wuno.Api.Services.StaleGameCleanupService>();
 builder.Services.AddHostedService<Wuno.Api.Services.ExpiredTurnRecoveryService>();
 builder.Services.AddControllers().AddJsonOptions(o => {
     o.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;

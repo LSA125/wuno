@@ -158,7 +158,7 @@ namespace Wuno.Api.Tests
             public Task<int> GetCurrentSeatAsync(Guid gameId, CancellationToken ct) => Task.FromResult(_join!.State.CurrentTurn.Seat);
             public Task<GameCodeResponse> GetUserActiveGameCodeAsync(Guid userId, CancellationToken ct) => Task.FromResult(new GameCodeResponse(true, true, ""));
             public Task<(Guid gameId, List<PlayerState> players)> DisconnectProtocolAsync(Guid playerId, CancellationToken ct) => Task.FromResult((Guid.NewGuid(), new List<PlayerState>()));
-            public Task<Guid?> LeaveGameAsync(Guid userId, CancellationToken ct) => Task.FromResult<Guid?>(null);
+            public Task<LeaveGameResult> LeaveGameAsync(Guid userId, CancellationToken ct) => Task.FromResult(new LeaveGameResult(Guid.NewGuid(), false, new List<PlayerState>(), null));
             public Task ReadyAsync(Guid gameId, int seat, bool isReady, CancellationToken ct) => Task.CompletedTask;
             public Task ForceEndGame(Guid gameId, CancellationToken ct) => Task.CompletedTask;
             public Task<GameState?> TimeoutAndAdvanceAsync(Guid gameId, Guid turnId, CancellationToken ct) => Task.FromResult<GameState?>(_join!.State);
