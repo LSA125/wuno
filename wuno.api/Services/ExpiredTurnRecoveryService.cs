@@ -80,31 +80,22 @@ namespace Wuno.Api.Services
                     
                     if (state != null)
                     {
-                        // Broadcast the updated state - wrap in try/catch for Azure SignalR reflection issues
+                        // Schedule the next turn timer FIRST if game is still active
+                        // This ensures the timer chain never breaks, even if broadcast fails
+                        if (state.Status != GameStatus.FINISHED && state.CurrentTurn != null)
+                        {
+                            var dueAt = DateTime.SpecifyKind(state.CurrentTurn.DueAt, DateTimeKind.Utc);
+                            _turnTimer.Schedule(state.GameId, state.CurrentTurn.TurnId, dueAt, BroadcastAfterTimeoutAsync);
+                        }
+                        
+                        // Now broadcast - if this fails, timer is already scheduled
                         try
                         {
                             await _hubContext.Clients.Group($"game:{expired.GameId}").SendAsync("GameUpdated", state, ct);
                         }
-                        catch (InvalidCastException ex)
+                        catch (Exception ex)
                         {
-                            _logger.LogWarning(ex, "Broadcast failed for game {GameId} (Azure SignalR reflection issue)", expired.GameId);
-                        }
-                        
-                        // Schedule the next turn timer if game is still active
-                        if (state.Status != GameStatus.FINISHED)
-                        {
-                            var dueAt = DateTime.SpecifyKind(state.CurrentTurn.DueAt, DateTimeKind.Utc);
-                            _turnTimer.Schedule(state.GameId, state.CurrentTurn.TurnId, dueAt, async (s) =>
-                            {
-                                try
-                                {
-                                    await _hubContext.Clients.Group($"game:{s.GameId}").SendAsync("GameUpdated", s);
-                                }
-                                catch (InvalidCastException)
-                                {
-                                    // Azure SignalR reflection issue - notification failed but game state is saved
-                                }
-                            });
+                            _logger.LogWarning(ex, "Broadcast failed for game {GameId}", expired.GameId);
                         }
                         
                         _logger.LogInformation("Recovered turn {TurnId} and advanced game {GameId}", expired.TurnId, expired.GameId);
@@ -114,6 +105,29 @@ namespace Wuno.Api.Services
                 {
                     _logger.LogError(ex, "Failed to recover turn {TurnId} for game {GameId}", expired.TurnId, expired.GameId);
                 }
+            }
+        }
+        
+        /// <summary>
+        /// Callback for turn timer - schedules the next timer before broadcasting.
+        /// </summary>
+        private async Task BroadcastAfterTimeoutAsync(Wuno.Application.Games.Util.GameState state)
+        {
+            // Schedule next timer FIRST to ensure chain never breaks
+            if (state.Status != GameStatus.FINISHED && state.CurrentTurn != null)
+            {
+                var dueAt = DateTime.SpecifyKind(state.CurrentTurn.DueAt, DateTimeKind.Utc);
+                _turnTimer.Schedule(state.GameId, state.CurrentTurn.TurnId, dueAt, BroadcastAfterTimeoutAsync);
+            }
+            
+            // Attempt broadcast - if this fails, timer chain is already scheduled
+            try
+            {
+                await _hubContext.Clients.Group($"game:{state.GameId}").SendAsync("GameUpdated", state);
+            }
+            catch (Exception)
+            {
+                // Broadcast failed but timer is already scheduled
             }
         }
     }

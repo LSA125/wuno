@@ -1,4 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Linq;
 using System.Threading.Tasks;
 using wuno.domain;
@@ -23,7 +25,7 @@ public sealed class TurnTimerTests
         }));
         var provider = serviceCollection.BuildServiceProvider();
 
-        var timer = new TurnTimer(provider.GetRequiredService<IServiceScopeFactory>());
+        var timer = new TurnTimer(provider.GetRequiredService<IServiceScopeFactory>(), NullLogger<TurnTimer>.Instance);
         var gameId = Guid.NewGuid();
         var turnId = Guid.NewGuid();
 
@@ -47,7 +49,7 @@ public sealed class TurnTimerTests
         var serviceCollection = new ServiceCollection();
         serviceCollection.AddSingleton<IGameService>(new StubGameService((_, _) => Task.FromResult<GameState?>(null)));
         var provider = serviceCollection.BuildServiceProvider();
-        var timer = new TurnTimer(provider.GetRequiredService<IServiceScopeFactory>());
+        var timer = new TurnTimer(provider.GetRequiredService<IServiceScopeFactory>(), NullLogger<TurnTimer>.Instance);
         var turnId = Guid.NewGuid();
         var broadcasted = false;
 
@@ -72,7 +74,7 @@ public sealed class TurnTimerTests
         serviceCollection.AddSingleton<IGameService>(new StubGameService((g, _) => Task.FromResult<GameState?>(
             new GameState(g, GameStatus.ACTIVE, 1, 1, 1, null, new(), new(Guid.NewGuid(), 0, null, DateTime.UtcNow, null), new(Guid.NewGuid(), 0, 1, DateTime.UtcNow, DateTime.UtcNow.AddSeconds(10), 1, 0)))));
         var provider = serviceCollection.BuildServiceProvider();
-        var timer = new TurnTimer(provider.GetRequiredService<IServiceScopeFactory>());
+        var timer = new TurnTimer(provider.GetRequiredService<IServiceScopeFactory>(), NullLogger<TurnTimer>.Instance);
         var turnId = Guid.NewGuid();
         int callbacks = 0;
 

@@ -211,10 +211,21 @@ namespace Wuno.Api.Hubs
 
         private async Task BroadcastAfterTimeout(GameState state)
         {
-            await _hub.Clients.Group($"game:{state.GameId}").SendAsync("GameUpdated", state);
-            if (state.Status != wuno.domain.GameStatus.FINISHED)
+            // Schedule next timer FIRST to ensure chain never breaks, even if broadcast fails
+            if (state.Status != wuno.domain.GameStatus.FINISHED && state.CurrentTurn != null)
             {
                 _turnTimer.Schedule(state.GameId, state.CurrentTurn.TurnId, EnsureUtc(state.CurrentTurn.DueAt), BroadcastAfterTimeout);
+            }
+            
+            // Now attempt broadcast - if this fails, the timer chain is already scheduled
+            try
+            {
+                await _hub.Clients.Group($"game:{state.GameId}").SendAsync("GameUpdated", state);
+            }
+            catch (Exception)
+            {
+                // Broadcast failed but timer is already scheduled - game state is saved in DB
+                // Clients will get updated state on next poll or turn
             }
         }
     }
