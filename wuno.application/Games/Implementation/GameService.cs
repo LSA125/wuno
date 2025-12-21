@@ -56,7 +56,9 @@ namespace Wuno.Application.Games.Implementation
         {
             foreach (var p in players)
             {
-                p.IsActive = p.IsTaken;
+                // Only activate players who are still connected - prevents infinite timeout loop
+                // for disconnected players who are still marked as IsTaken
+                p.IsActive = p.IsTaken && p.IsConnected;
                 p.LastWord = null;
                 p.TurnsPlayedThisRound = 0;
                 p.RemainingTime = Constants.INITIAL_REMAINING_TIME_SEC;
@@ -286,7 +288,17 @@ namespace Wuno.Application.Games.Implementation
                 if (winner is not null)
                 {
                     winner.RoundWins += 1;
-                    matchEnded = winner.RoundWins >= game.TargetWins || game.Players.Count(p => p.IsTaken) <= 1; ;
+                    matchEnded = winner.RoundWins >= game.TargetWins || game.Players.Count(p => p.IsTaken) <= 1;
+                }
+                
+                // Also end match if no connected players would be active after reset
+                if (!matchEnded)
+                {
+                    int connectedTakenPlayers = game.Players.Count(p => p.IsTaken && p.IsConnected);
+                    if (connectedTakenPlayers < 2)
+                    {
+                        matchEnded = true;
+                    }
                 }
 
                 if (matchEnded)
@@ -622,6 +634,17 @@ namespace Wuno.Application.Games.Implementation
                 {
                     winner.RoundWins += 1;
                     matchEnded = winner.RoundWins >= game.TargetWins || game.Players.Count(p => p.IsTaken) <= 1;
+                }
+                
+                // Also end match if no connected players would be active after reset
+                // This prevents infinite timeout loops when all players disconnect
+                if (!matchEnded)
+                {
+                    int connectedTakenPlayers = game.Players.Count(p => p.IsTaken && p.IsConnected);
+                    if (connectedTakenPlayers < 2)
+                    {
+                        matchEnded = true;
+                    }
                 }
 
                 if (matchEnded)
