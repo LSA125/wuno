@@ -4,6 +4,8 @@
 
 > ⚠️ **Note:** The app is hosted on Azure free tier. Initial load may take 30-60 seconds while the services wake up from cold start.
 
+> ⚠️ **Warning:** If the database fails to connect, it's likely I've run out of vcore seconds on the Azure SQL free tier (100,000 per month). It resets on the 1st of each month.
+
 Wuno is a fast, real-time party word game you can spin up and play with friends.  
 The back end is built with ASP.NET Core, SignalR, and EF Core.  
 The front end is a React SPA developed using Vite and Tailwind CSS.  
