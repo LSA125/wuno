@@ -640,19 +640,19 @@ namespace Wuno.Application.Games.Implementation
             }
 
             int personalIndex = player.TurnsPlayedThisRound;
-            bool timedOut = now >= currentTurn.DueAt;
+            // If timer fired early, wait for the remaining time before timing out
+            // This ensures the turn always gets closed properly
+            var remainingTime = currentTurn.DueAt - now;
+            if (remainingTime > TimeSpan.Zero)
+            {
+                await Task.Delay(remainingTime, ct);
+                now = DateTime.UtcNow;
+            }
 
-            if (timedOut)
-            {
-                currentTurn.EndedAt = now;
-                currentTurn.EndReason = TurnEndReason.TIMEOUT;
-                player.IsActive = false;
-                player.TurnsPlayedThisRound += 1;
-            }
-            else
-            {
-                return null;
-            }
+            currentTurn.EndedAt = now;
+            currentTurn.EndReason = TurnEndReason.TIMEOUT;
+            player.IsActive = false;
+            player.TurnsPlayedThisRound += 1;
 
             bool roundEnded = game.Players.Count(p => p.IsTaken && p.IsActive) <= 1;
             bool matchEnded = false;

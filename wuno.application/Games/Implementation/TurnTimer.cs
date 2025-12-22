@@ -62,7 +62,8 @@ namespace Wuno.Application.Games.Implementation
                 
                 if (state is null)
                 {
-                    _logger.LogDebug("TimeoutAndAdvanceAsync returned null for turn {TurnId} - turn may have already ended", turnId);
+                    _logger.LogWarning("TimeoutAndAdvanceAsync returned null for turn {TurnId} in game {GameId} - turn may have already ended or fired early", 
+                        turnId, gameId);
                     return;
                 }
                 
