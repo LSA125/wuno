@@ -67,17 +67,22 @@ export default function LiveGame({
         []
     );
 
+    // Update seen words when players change, but don't clear input
     useEffect(() => {
         const nextHistory = new Set<string>();
         players.forEach((p) => {
             if (p.lastWord) nextHistory.add(normalizeWord(p.lastWord));
         });
         setSeenWords(nextHistory);
+    }, [players]);
+
+    // Clear input only on turn/round changes
+    useEffect(() => {
         setInput("");
         setInvalidReason(null);
         setShake(false);
         lastMatchRef.current = 0;
-    }, [players, state.currentRound?.roundId, turn?.turnId]);
+    }, [state.currentRound?.roundId, turn?.turnId]);
 
     useEffect(() => {
         if (!submitError) return;

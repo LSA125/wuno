@@ -549,7 +549,8 @@ namespace Wuno.Application.Games.Implementation
             player.LastWord = null;
             player.TurnsPlayedThisRound = 0;
             player.RemainingTime = Constants.INITIAL_REMAINING_TIME_SEC;
-            player.UserId = null;
+            // Keep UserId so stats can find historical game data
+            // player.UserId = null;
             
             user.ActivePlayer = null;
             

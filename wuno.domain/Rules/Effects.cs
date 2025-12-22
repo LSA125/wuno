@@ -30,14 +30,14 @@
 
         /// <summary>
         /// Calculate debuffs for opponent based on excess bonuses:
-        /// Tneg = max(Tmax - (Tremaining + score*0.5), 0)
+        /// Tneg = max((Tremaining + score*0.5) - Tmax, 0)  // Overflow beyond cap
         /// Ladd = max(floor(score/3) - Lrequired, 0)
         /// </summary>
         public static (double timeDebuff, int minLenDebuff) CalculateOpponentDebuffs(
             double remainingTime, int score, int tMax, int lRequired)
         {
             double selfTimeWithBonus = remainingTime + score * Constants.TIME_BONUS_MULTIPLIER;
-            return (Math.Max(tMax - selfTimeWithBonus, 0),
+            return (Math.Max(selfTimeWithBonus - tMax, 0),
                     Math.Max(score / Constants.SCORE_DIVISOR - lRequired, 0));
         }
 
