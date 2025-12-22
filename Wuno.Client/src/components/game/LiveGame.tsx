@@ -447,7 +447,7 @@ export default function LiveGame({
                     </RestrictionTrack>
 
                     {/* Mobile input - visible on mobile during user's turn */}
-                    {myTurn && (
+                    {isMobile && myTurn && (
                         <div className="mobile-input-container d-flex gap-2">
                             <input
                                 ref={mobileInputRef}
