@@ -12,7 +12,7 @@ using wuno.infrastructure;
 namespace Wuno.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251222025710_AddGameWinnerId")]
+    [Migration("20251222030512_AddGameWinnerId")]
     partial class AddGameWinnerId
     {
         /// <inheritdoc />
@@ -339,7 +339,7 @@ namespace Wuno.Infrastructure.Migrations
                     b.HasOne("wuno.domain.Player", "Winner")
                         .WithMany()
                         .HasForeignKey("WinnerId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.Navigation("CurrentRound");
 

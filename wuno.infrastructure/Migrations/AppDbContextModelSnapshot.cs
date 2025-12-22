@@ -336,7 +336,7 @@ namespace Wuno.Infrastructure.Migrations
                     b.HasOne("wuno.domain.Player", "Winner")
                         .WithMany()
                         .HasForeignKey("WinnerId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.Navigation("CurrentRound");
 

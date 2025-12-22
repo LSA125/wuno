@@ -27,8 +27,7 @@ namespace Wuno.Infrastructure.Migrations
                 table: "Games",
                 column: "WinnerId",
                 principalTable: "Players",
-                principalColumn: "Id",
-                onDelete: ReferentialAction.SetNull);
+                principalColumn: "Id");
         }
 
         /// <inheritdoc />
