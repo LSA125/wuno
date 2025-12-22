@@ -56,5 +56,27 @@ namespace Wuno.Api.Controllers
             var result = await _svc.FindOrCreatePublicGameAsync(ct);
             return Ok(result);
         }
+
+        /// <summary>
+        /// Beacon-based leave for reliable tab close notification.
+        /// Used by sendBeacon in beforeunload - body may be empty.
+        /// </summary>
+        [HttpPost("leave")]
+        [AllowAnonymous]
+        public async Task<IActionResult> Leave([FromServices] IAppUserResolver who, CancellationToken ct)
+        {
+            if (!who.TryGet(out var userId))
+                return Ok(); // Silent fail for beacon - no auth means nothing to clean up
+            
+            try
+            {
+                await _svc.LeaveGameAsync(userId, ct);
+            }
+            catch
+            {
+                // Best effort - don't fail the beacon request
+            }
+            return Ok();
+        }
     }
 }

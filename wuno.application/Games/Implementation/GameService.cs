@@ -515,9 +515,11 @@ namespace Wuno.Application.Games.Implementation
         }
         async public Task<(Guid gameId, List<PlayerState> players)> DisconnectProtocolAsync(Guid playerId, CancellationToken ct)
         {
-            //mark player as disconnected
             Player? player = await _db.FindAsync<Player>(playerId);
-            if (player is null) throw new Exception("Player not found when disconnecting");
+            // Skip if player already left (beacon already handled it) or not found
+            if (player is null || !player.IsTaken)
+                return (Guid.Empty, []);
+            
             player.IsConnected = false;
             await _db.SaveChangesAsync(ct);
             return (player.GameId, await GetPlayersAsync(player.GameId, ct));
@@ -551,11 +553,12 @@ namespace Wuno.Application.Games.Implementation
             
             user.ActivePlayer = null;
             
-            // Check if there are any taken players left
-            var remainingCount = await _db.Players
-                .CountAsync(p => p.GameId == gameId && p.IsTaken && p.Id != player.Id, ct);
+            // Check if there are any CONNECTED taken players left
+            // (not just taken - disconnected players shouldn't keep the game alive)
+            var connectedCount = await _db.Players
+                .CountAsync(p => p.GameId == gameId && p.IsTaken && p.IsConnected && p.Id != player.Id, ct);
             
-            if (remainingCount <= 1)
+            if (connectedCount <= 1)
             {
                 // 0 or 1 player left - force end the game
                 var game = await _db.Games

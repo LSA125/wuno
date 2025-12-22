@@ -107,7 +107,13 @@ export default function GamePage() {
     }, [updateWordHistory]);
     useEffect(() => {
         const beforeUnload = () => {
-            try { hubRef.current?.invoke("LeaveGame", state?.gameId); } catch { }
+            // Use sendBeacon for reliable delivery on tab close
+            // The beacon API guarantees the browser will send this even during page unload
+            if (state?.gameId && navigator.sendBeacon) {
+                const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+                navigator.sendBeacon(`${API_BASE_URL}/api/games/leave`, "");
+            }
+            // Still try graceful SignalR stop (may not complete before tab closes)
             try { hubRef.current?.stop(); } catch { }
         };
         window.addEventListener("beforeunload", beforeUnload);

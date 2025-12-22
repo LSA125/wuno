@@ -115,7 +115,11 @@ namespace Wuno.Api.Hubs
             try
             {
                 var res = await _svc.DisconnectProtocolAsync(ps.PlayerId, ct);
-                await Clients.Group($"game:{ps.GameId}").SendAsync("PlayersUpdated", res.players, ct);
+                // Skip broadcast if player already left (beacon already handled it)
+                if (res.gameId != Guid.Empty)
+                {
+                    await Clients.Group($"game:{ps.GameId}").SendAsync("PlayersUpdated", res.players, ct);
+                }
             }
             catch
             {
