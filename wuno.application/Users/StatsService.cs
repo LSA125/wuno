@@ -33,27 +33,30 @@ namespace Wuno.Application.Users
                 );
             }
 
-            // Get all games the user participated in (finished games only for accurate stats)
-            var gamesPlayed = await _db.Players
-                .Where(p => p.UserId == userId && p.Game.Status == GameStatus.FINISHED)
-                .Select(p => p.GameId)
-                .Distinct()
-                .CountAsync(ct);
+            // Get player info for this user across all games
+            var userPlayerIds = await _db.Players
+                .Where(p => p.UserId == userId)
+                .Select(p => p.Id)
+                .ToListAsync(ct);
+            
+            var userPlayerIdSet = userPlayerIds.ToHashSet();
 
-            // Count games won: games where the user had the most round wins
-            var gamesWon = await _db.Games
+            // Get all games the user participated in (finished games only for accurate stats)
+            var gamesPlayed = await _db.Games
                 .Where(g => g.Status == GameStatus.FINISHED)
                 .Where(g => g.Players.Any(p => p.UserId == userId))
-                .Where(g => g.Players
-                    .Where(p => p.UserId == userId)
-                    .Max(p => p.RoundWins) >=
-                    g.Players.Max(p => p.RoundWins))
                 .CountAsync(ct);
 
-            // Total rounds won
-            var roundsWon = await _db.Players
-                .Where(p => p.UserId == userId)
-                .SumAsync(p => p.RoundWins, ct);
+            // Count games won using Game.WinnerId directly
+            var gamesWon = await _db.Games
+                .Where(g => g.Status == GameStatus.FINISHED && g.WinnerId != null)
+                .Where(g => userPlayerIdSet.Contains(g.WinnerId!.Value))
+                .CountAsync(ct);
+
+            // Total rounds won using Round.WinnerId
+            var roundsWon = await _db.Rounds
+                .Where(r => r.WinnerId != null && userPlayerIdSet.Contains(r.WinnerId.Value))
+                .CountAsync(ct);
 
             // Get all turns (words) played by this user
             var userTurns = await _db.Turns
@@ -101,13 +104,13 @@ namespace Wuno.Application.Users
 
         public async Task<InGameStatsResponse> GetInGameStatsAsync(Guid userId, CancellationToken ct)
         {
-            // Lightweight version for in-game display
-            var playerIds = await _db.Players
+            // Find all player IDs for this user
+            var userPlayerIds = await _db.Players
                 .Where(p => p.UserId == userId)
                 .Select(p => p.Id)
                 .ToListAsync(ct);
 
-            if (playerIds.Count == 0)
+            if (userPlayerIds.Count == 0)
             {
                 return new InGameStatsResponse(
                     TotalWins: 0,
@@ -118,19 +121,18 @@ namespace Wuno.Application.Users
                 );
             }
 
-            var gamesPlayed = await _db.Players
-                .Where(p => p.UserId == userId && p.Game.Status == GameStatus.FINISHED)
-                .Select(p => p.GameId)
-                .Distinct()
-                .CountAsync(ct);
+            var userPlayerIdSet = userPlayerIds.ToHashSet();
 
-            var gamesWon = await _db.Games
+            // Count games played (finished games only)
+            var gamesPlayed = await _db.Games
                 .Where(g => g.Status == GameStatus.FINISHED)
                 .Where(g => g.Players.Any(p => p.UserId == userId))
-                .Where(g => g.Players
-                    .Where(p => p.UserId == userId)
-                    .Max(p => p.RoundWins) >=
-                    g.Players.Max(p => p.RoundWins))
+                .CountAsync(ct);
+
+            // Count games won using Game.WinnerId directly
+            var gamesWon = await _db.Games
+                .Where(g => g.Status == GameStatus.FINISHED && g.WinnerId != null)
+                .Where(g => userPlayerIdSet.Contains(g.WinnerId!.Value))
                 .CountAsync(ct);
 
             var userTurns = await _db.Turns

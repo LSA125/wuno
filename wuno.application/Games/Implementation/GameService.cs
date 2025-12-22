@@ -304,6 +304,7 @@ namespace Wuno.Application.Games.Implementation
                 if (matchEnded)
                 {
                     game.Status = GameStatus.FINISHED;
+                    game.WinnerId = winner?.Id;
                 }
                 else
                 {
@@ -540,6 +541,7 @@ namespace Wuno.Application.Games.Implementation
             Guid gameId = player.GameId;
             
             // Reset player slot so another player can take it
+            // Stats now use Round.WinnerId instead of Player.RoundWins
             player.IsConnected = false;
             player.IsTaken = false;
             player.IsActive = false;
@@ -549,7 +551,7 @@ namespace Wuno.Application.Games.Implementation
             player.LastWord = null;
             player.TurnsPlayedThisRound = 0;
             player.RemainingTime = Constants.INITIAL_REMAINING_TIME_SEC;
-            // Keep UserId so stats can find historical game data
+            // Keep UserId for stats queries
             // player.UserId = null;
             
             user.ActivePlayer = null;
@@ -571,6 +573,12 @@ namespace Wuno.Application.Games.Implementation
                 if (game != null && game.Status != GameStatus.FINISHED)
                 {
                     game.Status = GameStatus.FINISHED;
+                    // Set winner as player with most round wins
+                    var winner = game.Players
+                        .Where(p => p.IsTaken)
+                        .OrderByDescending(p => p.RoundWins)
+                        .FirstOrDefault();
+                    game.WinnerId = winner?.Id;
                     // Cancel any active turns
                     var activeTurns = await _db.Turns
                         .Where(t => t.GameId == gameId && t.EndedAt == null)
@@ -678,6 +686,7 @@ namespace Wuno.Application.Games.Implementation
                 if (matchEnded)
                 {
                     game.Status = GameStatus.FINISHED;
+                    game.WinnerId = winner?.Id;
                 }
                 else
                 {
@@ -726,6 +735,7 @@ namespace Wuno.Application.Games.Implementation
         public async Task ForceEndGame(Guid gameId, CancellationToken ct)
         {
             var game = await _db.Games
+              .Include(g => g.Players)
               .FirstOrDefaultAsync(g => g.Id == gameId, ct);
             var allTurns = await _db.Turns
               .Where(t => t.GameId == gameId && t.EndedAt == null)
@@ -737,6 +747,12 @@ namespace Wuno.Application.Games.Implementation
                 turn.EndReason = TurnEndReason.END;
                 _tt.Cancel(turn.Id);
             }
+            // Set winner as player with most round wins
+            var winner = game.Players
+                .Where(p => p.IsTaken)
+                .OrderByDescending(p => p.RoundWins)
+                .FirstOrDefault();
+            game.WinnerId = winner?.Id;
             game.Status = GameStatus.FINISHED;
             await _db.SaveChangesAsync(ct);
         }

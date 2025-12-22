@@ -46,6 +46,8 @@ namespace wuno.domain
         public Round? CurrentRound { get; set; }
         public string? LastWord { get; set; }
         public bool IsPublic { get; set; } = false;
+        public Guid? WinnerId { get; set; }  // PlayerId of game winner
+        public Player? Winner { get; set; }
     }
 
     public sealed class Player

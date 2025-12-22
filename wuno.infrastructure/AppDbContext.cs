@@ -24,6 +24,7 @@ namespace wuno.infrastructure
             b.Entity<Game>().HasMany(g => g.Turns).WithOne(t => t.Game).HasForeignKey(t => t.GameId).OnDelete(DeleteBehavior.Cascade);
             b.Entity<Game>().HasOne(g => g.CurrentRound).WithMany().OnDelete(DeleteBehavior.Restrict);
             b.Entity<Game>().HasOne(g => g.CurrentTurn).WithMany().OnDelete(DeleteBehavior.Restrict);
+            b.Entity<Game>().HasOne(g => g.Winner).WithMany().HasForeignKey(g => g.WinnerId).OnDelete(DeleteBehavior.SetNull);
             b.Entity<Player>().HasOne(p => p.Game).WithMany(g => g.Players).HasForeignKey(p => p.GameId).OnDelete(DeleteBehavior.Cascade);
             b.Entity<User>().HasOne(u => u.ActivePlayer).WithOne(p => p.User).HasForeignKey<Player>(p => p.UserId).OnDelete(DeleteBehavior.SetNull);
             b.Entity<EmailVerificationToken>().HasOne(t => t.User).WithMany().HasForeignKey(t => t.UserId).OnDelete(DeleteBehavior.Cascade);

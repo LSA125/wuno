@@ -276,6 +276,8 @@ export default function LiveGame({
 
             if (event.key === "Enter") {
                 event.preventDefault();
+                // Skip if mobile input is focused - let it handle the submit
+                if (document.activeElement === mobileInputRef.current) return;
                 attemptSubmit();
                 return;
             }
