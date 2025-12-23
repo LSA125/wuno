@@ -508,6 +508,7 @@ namespace Wuno.Application.Games.Implementation
             inactive.IsTaken = true;
             inactive.Name = user.Name ?? "Anonymous";
             inactive.IconUrl = user.IconUrl;
+            inactive.UserId = userId;
             user.ActivePlayer = inactive;
             await _db.SaveChangesAsync(ct);
             GameState? state = await GetGameStateAsync(gameId, ct);

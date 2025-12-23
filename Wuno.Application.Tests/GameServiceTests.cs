@@ -382,10 +382,15 @@ public sealed class GameServiceTests
             .AddPlayer(new PlayerBuilder().AtSeat(2).Taken(true).Active(true).Connected(true))
             .Build();
         var player = game.Players.First(p => p.Seat == 1);
-        var user = new User { Name = "Reconnector", ActivePlayer = player };
-        player.User = user;
+        var user = new User { Name = "Reconnector" };
+        player.UserId = user.Id;
 
+        // First save game and user without circular FK
         using var db = factory.CreateContext(ctx => ctx.AddRange(game, user));
+        // Now update ActivePlayerId after entities exist
+        user.ActivePlayerId = player.Id;
+        await db.SaveChangesAsync();
+        
         var service = CreateService(db);
 
         var response = await service.JoinGameAsync(game.Id, user.Id, CancellationToken.None);
@@ -490,13 +495,19 @@ public sealed class GameServiceTests
             .AddPlayer(player1)
             .AddPlayer(player2)
             .Build();
-        var user1 = new User { Name = "Player1", ActivePlayer = game.Players.First(p => p.Seat == 1) };
-        game.Players.First(p => p.Seat == 1).User = user1;
+        var user1 = new User { Name = "Player1" };
+        var p1 = game.Players.First(p => p.Seat == 1);
+        p1.UserId = user1.Id;
 
+        // First save game and user without circular FK
         using var db = factory.CreateContext(ctx => ctx.AddRange(game, user1));
+        // Now update ActivePlayerId after entities exist
+        user1.ActivePlayerId = p1.Id;
+        await db.SaveChangesAsync();
+        
         var timer = new FakeTurnTimer();
         var service = CreateService(db, timer);
-        var playerId = user1.ActivePlayer!.Id;  // Capture before LeaveGameAsync sets it to null
+        var playerId = p1.Id;  // Capture before LeaveGameAsync sets it to null
 
         // Player 1 leaves - only player 2 remains, so game should end
         var result = await service.LeaveGameAsync(user1.Id, CancellationToken.None);
@@ -526,10 +537,16 @@ public sealed class GameServiceTests
             .AddPlayer(player2)
             .AddPlayer(player3)
             .Build();
-        var user1 = new User { Name = "Player1", ActivePlayer = game.Players.First(p => p.Seat == 1) };
-        game.Players.First(p => p.Seat == 1).User = user1;
+        var user1 = new User { Name = "Player1" };
+        var p1 = game.Players.First(p => p.Seat == 1);
+        p1.UserId = user1.Id;
 
+        // First save game and user without circular FK
         using var db = factory.CreateContext(ctx => ctx.AddRange(game, user1));
+        // Now update ActivePlayerId after entities exist
+        user1.ActivePlayerId = p1.Id;
+        await db.SaveChangesAsync();
+        
         var service = CreateService(db);
 
         // Player 1 leaves - 2 players remain, game continues
